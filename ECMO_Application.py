@@ -1,3 +1,5 @@
+import sys
+import os
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkcalendar import Calendar
@@ -5,7 +7,6 @@ from PIL import Image, ImageTk
 import pandas as pd
 from datetime import date, datetime, timedelta
 import reportMetrics
-import os
 import csv
 
 
@@ -16,6 +17,18 @@ filename = "PRECARE_activity_report.csv"
 date_from = date(1900, 1, 1)
 date_to = date(1900, 1, 1)
 
+
+def resource_path(filename):
+    """
+    Returns the correct path to a resource file whether running
+    as a script or as a PyInstaller bundle.
+    """
+    if hasattr(sys, '_MEIPASS'):
+        # Running as a PyInstaller bundle
+        return os.path.join(sys._MEIPASS, filename)
+    else:
+        # Running as a normal script
+        return os.path.join(os.path.dirname(__file__), filename)
 
 def choose_file():
     global df
@@ -313,11 +326,11 @@ def show_info():
     btn_close = tk.Button(popup, text="Close", width=10, command=popup.destroy)
     btn_close.pack(pady=(0, 15))
 
-def make_image(root):
+def write_header_image(root):
     """Loads and displays an image at the top of the window."""
     try:
         from PIL import Image, ImageTk
-        img = Image.open("wma_photo.png")      # replace with your image path
+        img = Image.open(resource_path("assets/wma_photo.png"))
         #img = img.resize((500, 100))            # resize to fit the window
         photo = ImageTk.PhotoImage(img)
         lbl_image = tk.Label(root, image=photo)
@@ -368,7 +381,7 @@ def make_info_button(root):
     """Places a small info button in the bottom right corner."""
     try:
         from PIL import Image, ImageTk
-        img = Image.open("info.png")       # replace with your icon path
+        img = Image.open(resource_path("assets/info.png"))
         img = img.resize((24, 24))
         photo = ImageTk.PhotoImage(img)
         btn_info = tk.Button(root, image=photo, command=show_info, bd=0, cursor="hand2")
@@ -383,10 +396,10 @@ def make_info_button(root):
 
 def main():
     root = tk.Tk()
-    root.title("ECPR Report Generator")
+    root.title("PRECARE Report Generator")
     root.resizable(False, False)
 
-    make_image(root)
+    write_header_image(root)
     make_file_buttons(root)
     make_calender_elements(root)
 

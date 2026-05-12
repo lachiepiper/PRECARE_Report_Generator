@@ -1,0 +1,3 @@
+([('PRECARE Reporter',
+   '/Users/lachiepiper/Desktop/ECMO/ECMO Application/dist/PRECARE Reporter',
+   'EXECUTABLE')],)
