@@ -7,6 +7,8 @@ from PIL import Image, ImageTk
 import pandas as pd
 from datetime import date, datetime, timedelta
 import reportMetrics
+from precare_DataStructure import PrecareReport as pr
+from typing import Optional
 import csv
 import requests
 import io
@@ -14,6 +16,7 @@ import io
 
 # Global variables
 df = None
+PrecareReport = pr
 output_path = None
 filename = "PRECARE_activity_report.csv"
 date_from = date(1900, 1, 1)
@@ -40,7 +43,9 @@ def choose_file():
         filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
     )
     #debug
-    #file_path = "/Users/lachiepiper/Desktop/ECMO/ECMO Application/PRECARE_DATA_2026-05-11_1023.csv"
+    file_path = "/Users/lachiepiper/Desktop/ECMO/ECMO Application/assets/PRECARE_DATA_2026-05-11_1023.csv"
+    print(f"choosing file: {file_path}") #DEBUG
+
     if file_path:
         try:
             df = pd.read_csv(file_path)
@@ -48,7 +53,7 @@ def choose_file():
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load CSV file:\n{e}")
 
-def REDCAP_Data():
+def get_REDCAP_Data():
     global df
     # Define the API URL and your specific project token
     api_url = 'INSERT TOKEN'
@@ -134,9 +139,7 @@ def open_calendar(title, cal_button, is_from):
 
 def generate_report_csv():
     #TODO - DEBUG this when internet working
-    # REDCAP_Data();
-
-
+    # get_REDCAP_Data();
     if df is None:
         messagebox.showwarning("No File", "Please load a CSV file first.")
         return
@@ -156,6 +159,11 @@ def generate_report_csv():
 def write_dispatchActivity(csv):
     global df
     global date_from, date_to
+    global PrecareReport
+
+    #report must be initialised here
+    PrecareReport = pr.factory(customDates())
+    print(f"PrecareReport.custom_dates_present = {PrecareReport.custom_dates_present}")
 
     month_list = reportMetrics.dispatchActivity(
         date.today() - timedelta(days=30), date.today(), df
@@ -171,6 +179,7 @@ def write_dispatchActivity(csv):
         "Last 30 Days": month_list,
         "Last 90 Days": three_month_list
     })
+
     if customDates():
         custom_date_list = reportMetrics.dispatchActivity(date_from, date_to, df)
         dispatchActivity_df.insert(
@@ -179,12 +188,15 @@ def write_dispatchActivity(csv):
             custom_date_list
             )
 
+    PrecareReport.set_dispatchActivity(dispatchActivity_df)
+
     dispatchActivity_df.to_csv(csv, index=False)
     print(f"Dispatch activity Saved to: {csv}")
 
 def write_caseClassification(csv):
     global df
     global date_from, date_to
+    global PrecareReport
 
     month_data = reportMetrics.caseClassification(
         date.today() - timedelta(days=30), date.today(), df
@@ -206,12 +218,15 @@ def write_caseClassification(csv):
             custom_date_data
             )
 
+    PrecareReport.set_CaseClassification(caseClassification_df)
+
     caseClassification_df.to_csv(csv, mode="a", index=False)
     print(f"Case Classification Saved to: {csv}")
 
 def write_Interventions(csv):
     global df
     global date_from, date_to
+    global PrecareReport
 
     month_list = reportMetrics.interventionsPerformed(
         date.today() - timedelta(days=30), date.today(), df
@@ -236,6 +251,7 @@ def write_Interventions(csv):
             date_from.strftime("%d/%m/%Y") + " - " + date_to.strftime("%d/%m/%Y"),
             custom_date_data
             )
+    PrecareReport.set_Interventions(Interventions_df)
 
     Interventions_df.to_csv(csv, mode="a", index=False)
     print(f"Interventions Performed Saved to: {csv}")
@@ -243,6 +259,7 @@ def write_Interventions(csv):
 def write_ArtLine(csv):
     global df
     global date_from, date_to
+    global PrecareReport
 
     month_list = reportMetrics.ArtLineAnalysis(
         date.today() - timedelta(days=30), date.today(), df
@@ -266,12 +283,15 @@ def write_ArtLine(csv):
             custom_date_list
             )
 
+    PrecareReport.set_Artline_data(ArtLine_df)
+
     ArtLine_df.to_csv(csv, mode="a", index=False)
     print(f"Artline Analysis Saved to: {csv}")
 
 def write_ROSCRates(csv):
     global df
     global date_from, date_to
+    global PrecareReport
 
     month_list = reportMetrics.ROSCRateAnalysis(
         date.today() - timedelta(days=30), date.today(), df
@@ -300,6 +320,8 @@ def write_ROSCRates(csv):
             date_from.strftime("%d/%m/%Y") + " - " + date_to.strftime("%d/%m/%Y"),
             custom_date_list
             )
+
+    PrecareReport.set_ROSC_rates(ROSCRates_df)
 
     ROSCRates_df.to_csv(csv, mode="a", index=False)
     print(f"ROSC Rates  Saved to: {csv}")

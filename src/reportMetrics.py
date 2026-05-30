@@ -233,8 +233,8 @@ def ROSCRateAnalysis(date_from, date_to, df):
                     successful_cannulation += 1
 
     try:
-        any_ROSC_str = f"{any_ROSC}/{total_patients} {(any_ROSC/total_patients)*100:.2f}%"
-        sustained_ROSC_str = f"{sustained_ROSC}/{total_patients} {(any_ROSC/total_patients)*100:.2f}%"
+        any_ROSC_str = f"{any_ROSC}/{total_patients} ({(any_ROSC/total_patients)*100:.2f}%)"
+        sustained_ROSC_str = f"{sustained_ROSC}/{total_patients} ({(sustained_ROSC/total_patients)*100:.2f}%)"
 
     except ZeroDivisionError:
         any_ROSC_str =  "0/0 (0%)"
