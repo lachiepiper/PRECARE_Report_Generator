@@ -8,6 +8,8 @@ import pandas as pd
 from datetime import date, datetime, timedelta
 import reportMetrics
 import csv
+import requests
+import io
 
 
 # Global variables
@@ -46,13 +48,43 @@ def choose_file():
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load CSV file:\n{e}")
 
+def REDCAP_Data():
+    global df
+    # Define the API URL and your specific project token
+    api_url = 'INSERT TOKEN'
+    api_token = 'YOUR_API_TOKEN_HERE'
+
+    # Set up the payload parameters
+    payload = {
+        'token': api_token,
+        'content': 'record',
+        'format': 'csv',
+        'type': 'flat',
+        'rawOrLabel': 'raw',              # Ensures data values, not text labels
+        'rawOrLabelHeaders': 'raw',       # Ensures variable names, not field labels
+        'exportCheckboxLabel': 'false',   # Exports checkboxes as 0 or 1
+        'returnFormat': 'json'}
+
+    # Make the API request
+    response = requests.post(api_url, data=payload)
+
+    # Save the response text to a CSV file if successful
+    if response.status_code == 200:
+        # io.StringIO makes the text behave like a file for pandas
+        df = pd.read_csv(io.StringIO(response.text))
+            # Preview the data - TODO: REMOVE THIS
+        print("DataFrame successfully created!")
+        print(df.head())
+    else:
+        print(f"Error: {response.status_code} - {response.text}")
+
 
 def choose_output_destination():
     global output_path
 
-    output_path = filedialog.askdirectory(title="Select Output Destination")
+    #output_path = filedialog.askdirectory(title="Select Output Destination")
     #debug
-    #output_path = "/Users/lachiepiper/Desktop/ECMO/ECMO Application/OUTPUT TESTS"
+    output_path = "/Users/lachiepiper/Desktop/ECMO/ECMO Application/OUTPUT TESTS"
     if output_path:
         print(f"Selected output destination: {output_path}")
 
@@ -101,6 +133,10 @@ def open_calendar(title, cal_button, is_from):
     btn_confirm.pack(pady=(0, 10))
 
 def generate_report_csv():
+    #TODO - DEBUG this when internet working
+    # REDCAP_Data();
+
+
     if df is None:
         messagebox.showwarning("No File", "Please load a CSV file first.")
         return
@@ -116,7 +152,6 @@ def generate_report_csv():
     write_ROSCRates(full_path)
 
     print("report generated")
-    #return reportCSVBuilder()
 
 def write_dispatchActivity(csv):
     global df
@@ -330,7 +365,7 @@ def write_header_image(root):
     """Loads and displays an image at the top of the window."""
     try:
         from PIL import Image, ImageTk
-        img = Image.open(resource_path("assets/wma_photo.png"))
+        img = Image.open(resource_path("/Users/lachiepiper/Desktop/ECMO/ECMO Application/assets/wma_photo.png"))
         #img = img.resize((500, 100))            # resize to fit the window
         photo = ImageTk.PhotoImage(img)
         lbl_image = tk.Label(root, image=photo)
@@ -381,7 +416,7 @@ def make_info_button(root):
     """Places a small info button in the bottom right corner."""
     try:
         from PIL import Image, ImageTk
-        img = Image.open(resource_path("assets/info.png"))
+        img = Image.open(resource_path("/Users/lachiepiper/Desktop/ECMO/ECMO Application/assets/info.png"))
         img = img.resize((24, 24))
         photo = ImageTk.PhotoImage(img)
         btn_info = tk.Button(root, image=photo, command=show_info, bd=0, cursor="hand2")
