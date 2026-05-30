@@ -139,6 +139,7 @@ def open_calendar(title, cal_button, is_from):
 
 def generate_report_csv():
     #TODO - DEBUG this when internet working
+    global PrecareReport
     # get_REDCAP_Data();
     if df is None:
         messagebox.showwarning("No File", "Please load a CSV file first.")
@@ -155,6 +156,9 @@ def generate_report_csv():
     write_ROSCRates(full_path)
 
     print("report generated")
+
+    PrecareReport.to_csv(path = full_path+"DATA_STRUCTUREreport.csv")
+
 
 def write_dispatchActivity(csv):
     global df

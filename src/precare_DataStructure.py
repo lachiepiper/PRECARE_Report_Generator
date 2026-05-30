@@ -320,9 +320,9 @@ class PrecareReport:
     def parse_time_ranges(self, timerange):
         """ takes a string in form MM:SS (MM:SS - MM:SS) and returns its
         constituant parts (median, low, high) as a list of minute values """
-        med = self.to_min(timerange[0:4])
-        min = self.to_min(timerange[7:11])
-        max = self.to_min(timerange[15:19])
+        med = self.to_min(timerange[0:5])
+        min = self.to_min(timerange[7:12])
+        max = self.to_min(timerange[15:20])
         return [med, min, max]
 
     def parse_percentages(self, string):
@@ -463,6 +463,7 @@ class PrecareReport:
 
         month_list = df["Last 30 Days"]
         three_month_list = df["Last 90 Days"]
+        print(f"month list = {month_list}\n3 month list = {three_month_list}")
 
         self.rsi_30d = int(month_list[0])
         self.rsi_90d = int(three_month_list[0])
@@ -500,7 +501,7 @@ class PrecareReport:
         self.tte_90d = int(three_month_list[8])
 
         self.poc_abg_30d = int(month_list[9])
-        self.poc_abg_90 = int(three_month_list[9])
+        self.poc_abg_90d = int(three_month_list[9])
 
     def set_Artline_data(self, df:pd.dataframe):
         """
@@ -718,6 +719,17 @@ class PrecareReport:
                 return med_str
             return f"{med_str} ({fmt_time(low)} - {fmt_time(high)})"
 
+        def fmt_float_with_range(median: Optional[float],
+                                low: Optional[float],
+                                high: Optional[float]) -> str:
+            """Reassemble 'X (Y- Z)' from three float values."""
+            if median is None:
+                return ""
+            if low is None or high is None:
+                return med_str
+            return f"{median} ({low} - {high})"
+
+
         def fmt_count_pct(count: Optional[int], pct: Optional[float]) -> str:
             """Reassemble 'N (PP.PP%)' format."""
             if count is None:
@@ -734,7 +746,7 @@ class PrecareReport:
                 return ""
             if pct is None:
                 return f"{num}/{den}"
-            return f"{num}/{den} {pct:.2f}%"
+            return f"{num}/{den} ({pct:.2f}%)"
 
         def fmt_access(io: Optional[int],
                        iv: Optional[int],
@@ -975,13 +987,13 @@ class PrecareReport:
 
         rows.append(row(
             "Median time from PRECARE arrival to ROSC (range)",
-            fmt_time_with_range(self.precare_arrival_to_rosc_30d,
+            fmt_float_with_range(self.precare_arrival_to_rosc_30d,
                                 self.precare_arrival_to_rosc_30d_low,
                                 self.precare_arrival_to_rosc_30d_high),
-            fmt_time_with_range(self.precare_arrival_to_rosc_90d,
+            fmt_float_with_range(self.precare_arrival_to_rosc_90d,
                                 self.precare_arrival_to_rosc_90d_low,
                                 self.precare_arrival_to_rosc_90d_high),
-            fmt_time_with_range(self.precare_arrival_to_rosc_range,
+            fmt_float_with_range(self.precare_arrival_to_rosc_range,
                                 self.precare_arrival_to_rosc_range_low,
                                 self.precare_arrival_to_rosc_range_high),
         ))
