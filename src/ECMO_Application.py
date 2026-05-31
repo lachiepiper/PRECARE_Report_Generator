@@ -12,6 +12,7 @@ from typing import Optional
 import csv
 import requests
 import io
+from Graphing import open_outcomes_window
 
 
 # Global variables
@@ -162,6 +163,8 @@ def generate_report_csv():
     print("report generated")
 
     PrecareReport.to_csv(path = full_path+"DATA_STRUCTUREreport.csv")
+
+    open_outcomes_window(PrecareReport)
 
 
 def write_dispatchActivity(csv):
