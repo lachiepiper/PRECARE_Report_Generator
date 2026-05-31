@@ -140,6 +140,10 @@ def open_calendar(title, cal_button, is_from):
 def generate_report_csv():
     #TODO - DEBUG this when internet working
     global PrecareReport
+    global df
+    global date_from, date_to
+    #report must be initialised here
+    PrecareReport = pr.factory(customDates(), date_range_label = f"{date_from:%d/%m/%Y} - {date_to:%d/%m/%Y}")
     # get_REDCAP_Data();
     if df is None:
         messagebox.showwarning("No File", "Please load a CSV file first.")
@@ -165,8 +169,7 @@ def write_dispatchActivity(csv):
     global date_from, date_to
     global PrecareReport
 
-    #report must be initialised here
-    PrecareReport = pr.factory(customDates())
+
     print(f"PrecareReport.custom_dates_present = {PrecareReport.custom_dates_present}")
 
     month_list = reportMetrics.dispatchActivity(

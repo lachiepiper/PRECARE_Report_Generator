@@ -38,7 +38,7 @@ class PrecareReport:
     # ── Optional date range label ────────────────────────────────────────────
     # e.g. "01/05/2022 - 29/05/2026"
     # Set this if the custom date range column is present.
-    custom_dates_present: Bool = None
+    custom_dates_present: Optional[bool] = None
     date_range_label: Optional[str] = None
 
     # ════════════════════════════════════════════════════════════════════════
@@ -444,22 +444,22 @@ class PrecareReport:
         """
 
         if self.custom_dates_present:
-            self.rsi_range = int(df.iloc[0, 3][0])
-            self.thoracostomy_range = int(df.iloc[0, 3][1])
-            self.fem_art_line_range = int(df.iloc[0, 3][2])
-            self.radial_art_line_range = int(df.iloc[0, 3][3])
-            self.assisted_ett_range = int(df.iloc[0, 3][4])
+            self.rsi_range = int(df.iloc[0, 3])
+            self.thoracostomy_range = int(df.iloc[1, 3])
+            self.fem_art_line_range = int(df.iloc[2, 3])
+            self.radial_art_line_range = int(df.iloc[3, 3])
+            self.assisted_ett_range = int(df.iloc[4, 3])
 
-            access = self.parse_access(df.iloc[0, 3][5])
+            access = self.parse_access(df.iloc[5, 3])
 
             self.access_io_range = access[0]
             self.access_iv_range = access[1]
             self.access_central_range = access[2]
 
-            self.echo_ultrasound_range = int(df.iloc[0, 3][6])
-            self.intra_arrest_toe_range = int(df.iloc[0, 3][7])
-            self.tte_range = int(df.iloc[0, 3][8])
-            self.poc_abg_range = int(df.iloc[0, 3][9])
+            self.echo_ultrasound_range = int(df.iloc[6, 3])
+            self.intra_arrest_toe_range = int(df.iloc[7, 3])
+            self.tte_range = int(df.iloc[8, 3])
+            self.poc_abg_range = int(df.iloc[9, 3])
 
         month_list = df["Last 30 Days"]
         three_month_list = df["Last 90 Days"]
@@ -560,18 +560,23 @@ class PrecareReport:
                 Optional: custom date data
         """
 
-        def parse_integer_ranges(string):
-                #get claude to make this
-            med = 0
-            min = 0
-            max = 0
-            return [med, min, max]
+        def parse_integer_ranges(string: str) -> list[int]:
+            """
+            Parse a string in the format "X (Y - Z)" and return [X, Y, Z] as integers.
+
+            Example: "24 (10 - 38)" → [24, 10, 38]
+            """
+            string = string.strip()
+            x, rest = string.split(" (")
+            y, z    = rest.rstrip(")").split(" - ")
+            return [int(x), int(y), int(z)]
 
         def parse_ecmo_ranges(string):
             #get claude to make this
-            commenced = 0
-            cannulations = 0
-            return [commenced, cannulations]
+            string = string.strip()
+            x, rest  = string.split(" (")
+            y = rest.rstrip(")")
+            return [int(x), int(y)]
 
         if self.custom_dates_present:
             num_list = self.parse_percentages(df.iloc[0,3])
@@ -771,13 +776,16 @@ class PrecareReport:
             return str(val) if val is not None else ""
 
         # ── Column headers ────────────────────────────────────────────────────
-
-        col_range = self.date_range_label if self.has_date_range() else None
+        # Use custom_dates_present as the single source of truth for whether
+        # the range column should appear. Fall back to date_range_label as the
+        # column header text, or a generic label if no label was set.
+        include_range = bool(self.custom_dates_present)
+        col_range = self.date_range_label if self.date_range_label else "Custom Date Range"
 
         def row(description, v30, v90, vrange=None):
-            """Build one CSV row, including the range column only if present."""
+            """Build one CSV row, including the range column only if custom_dates_present."""
             r = [description, v30, v90]
-            if col_range is not None:
+            if include_range:
                 r.append(vrange if vrange is not None else "")
             return r
 
@@ -786,8 +794,7 @@ class PrecareReport:
         rows = []
 
         # ── Dispatch activity heading ─────────────────────────────────────────
-        rows.append(row("Dispatch activity", "Last 30 Days", "Last 90 Days",
-                        col_range))
+        rows.append(row("Dispatch activity", "Last 30 Days", "Last 90 Days", col_range))
 
         rows.append(row(
             "Number of patients with interventions",
@@ -836,8 +843,7 @@ class PrecareReport:
         ))
 
         # ── Case classification heading ───────────────────────────────────────
-        rows.append(row("Case Classification", "Last 30 Days", "Last 90 Days",
-                        col_range))
+        rows.append(row("Case Classification", "Last 30 Days", "Last 90 Days", col_range))
 
         rows.append(row(
             "Number of times patient was confirmed in cardiac arrest "
@@ -848,8 +854,7 @@ class PrecareReport:
         ))
 
         # ── Aeromedical interventions heading ─────────────────────────────────
-        rows.append(row("Aeromedical Interventions performed",
-                        "Last 30 Days", "Last 90 Days", col_range))
+        rows.append(row("Aeromedical Interventions performed", "Last 30 Days", "Last 90 Days", col_range))
 
         rows.append(row("RSI",
             fmt_int(self.rsi_30d), fmt_int(self.rsi_90d), fmt_int(self.rsi_range)))
@@ -893,8 +898,7 @@ class PrecareReport:
             fmt_int(self.poc_abg_range)))
 
         # ── Arterial lines heading ────────────────────────────────────────────
-        rows.append(row("Arterial Lines", "Last 30 Days", "Last 90 Days",
-                        col_range))
+        rows.append(row("Arterial Lines", "Last 30 Days", "Last 90 Days", col_range))
 
         rows.append(row(
             "Number of intra-arrest Art line insertions",
@@ -1018,8 +1022,23 @@ class PrecareReport:
 
         return csv_string
 
-    #Facotry method
-    def factory(customDates):
-        self = PrecareReport(custom_dates_present= customDates)
-        print(f"self.custom_dates_present = {self.custom_dates_present}")
-        return self
+    @classmethod
+    def factory(cls, custom_dates: bool = False, date_range_label: Optional[str] = None) -> "PrecareReport":
+        """
+        Create a new empty PrecareReport.
+
+        Parameters
+        ----------
+        custom_dates : bool
+            Set to True if a custom date range will be populated.
+            Controls whether to_csv() emits the range column.
+        date_range_label : str, optional
+            Human-readable label for the date range column header,
+            e.g. "01/05/2022 - 29/05/2026". Only used when custom_dates=True.
+        """
+        instance = cls(
+            custom_dates_present=custom_dates,
+            date_range_label=date_range_label if custom_dates else None,
+        )
+        print(f"PrecareReport created — custom_dates_present: {instance.custom_dates_present}")
+        return instance
