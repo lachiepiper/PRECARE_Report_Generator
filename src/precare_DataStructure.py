@@ -1040,5 +1040,4 @@ class PrecareReport:
             custom_dates_present=custom_dates,
             date_range_label=date_range_label if custom_dates else None,
         )
-        print(f"PrecareReport created — custom_dates_present: {instance.custom_dates_present}")
         return instance

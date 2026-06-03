@@ -144,7 +144,8 @@ def generate_report_csv():
     global df
     global date_from, date_to
     #report must be initialised here
-    PrecareReport = pr.factory(customDates(), date_range_label = f"{date_from:%d/%m/%Y} - {date_to:%d/%m/%Y}")
+    PrecareReport = pr.factory(customDates(),
+        date_range_label = f"{date_from:%d/%m/%Y} - {date_to:%d/%m/%Y}")
     # get_REDCAP_Data();
     if df is None:
         messagebox.showwarning("No File", "Please load a CSV file first.")
