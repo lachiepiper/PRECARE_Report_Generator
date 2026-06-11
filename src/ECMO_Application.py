@@ -18,6 +18,9 @@ output_path = None
 filename = "PRECARE_activity_report.csv"
 date_from = date(1900, 1, 1)
 date_to = date(1900, 1, 1)
+# REDCap credentials
+API_URL = "https://redcap.ohmr.health.nsw.gov.au/redcap_v16.1.5/index.php?pid=2145"  # PRECARE REDCap instance URL
+API_TOKEN = "YOUR_API_TOKEN_HERE"                      # From REDCap > API > Generate Token
 
 
 def resource_path(filename):
@@ -32,27 +35,11 @@ def resource_path(filename):
         # Running as a normal script
         return os.path.join(os.path.dirname(__file__), filename)
 
-def choose_file():
-    global df
-
-    file_path = filedialog.askopenfilename(
-        title="Select a CSV file",
-        filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
-    )
-    #debug
-    #file_path = "/Users/lachiepiper/Desktop/ECMO/ECMO Application/PRECARE_DATA_2026-05-11_1023.csv"
-    if file_path:
-        try:
-            df = pd.read_csv(file_path)
-            print(f"File loaded successfully: {file_path}")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to load CSV file:\n{e}")
-
 def REDCAP_Data():
     global df
-    # Define the API URL and your specific project token
-    api_url = 'INSERT TOKEN'
-    api_token = 'YOUR_API_TOKEN_HERE'
+    # Use the globally set API credentials
+    api_url = API_URL
+    api_token = API_TOKEN
 
     # Set up the payload parameters
     payload = {
@@ -72,21 +59,10 @@ def REDCAP_Data():
     if response.status_code == 200:
         # io.StringIO makes the text behave like a file for pandas
         df = pd.read_csv(io.StringIO(response.text))
-            # Preview the data - TODO: REMOVE THIS
         print("DataFrame successfully created!")
         print(df.head())
     else:
         print(f"Error: {response.status_code} - {response.text}")
-
-
-def choose_output_destination():
-    global output_path
-
-    #output_path = filedialog.askdirectory(title="Select Output Destination")
-    #debug
-    output_path = "/Users/lachiepiper/Desktop/ECMO/ECMO Application/OUTPUT TESTS"
-    if output_path:
-        print(f"Selected output destination: {output_path}")
 
 def open_calendar(title, cal_button, is_from):
     """
@@ -374,14 +350,36 @@ def write_header_image(root):
     except Exception as e:
         print(f"Could not load image: {e}")
 
-def make_file_buttons(root):
-    # get file address
-    btn_choose_file = tk.Button(root, text="Choose File", command=choose_file)
-    btn_choose_file.pack(pady=10)
+def make_api_key_widgets(root, btn_create_output):
+    """Adds the API key prompt, entry field, Enter button, and status label."""
+    global API_TOKEN
 
-    #get output destination
-    btn_choose_output = tk.Button(root, text="Choose Output Destination", command=choose_output_destination)
-    btn_choose_output.pack(pady=5)
+    api_frame = tk.Frame(root)
+    api_frame.pack(pady=(10, 0))
+
+    lbl_api = tk.Label(api_frame, text="Please enter your PRECARE REDCap API Key:")
+    lbl_api.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+
+    api_entry = tk.Entry(api_frame, width=36)
+    api_entry.grid(row=1, column=0, padx=(0, 6), ipady=3)
+
+    status_label = tk.Label(root, text="", fg="#2e7d32")
+    status_label.pack()
+
+    def on_enter():
+        global API_TOKEN
+        key = api_entry.get().strip()
+        if key:
+            API_TOKEN = key
+            status_label.config(text="✓ API key entered", fg="#2e7d32")
+            btn_create_output.config(state=tk.NORMAL)
+        else:
+            status_label.config(text="⚠ Please enter an API key first.", fg="#c62828")
+
+    btn_enter = tk.Button(api_frame, text="Enter", command=on_enter)
+    btn_enter.grid(row=1, column=1)
+
+    api_entry.bind("<Return>", lambda e: on_enter())
 
 def make_calender_elements(root):
         # --- Date range selector ---
@@ -435,13 +433,18 @@ def main():
     root.resizable(False, False)
 
     write_header_image(root)
-    make_file_buttons(root)
+
+    # Create the Create Report button first (disabled) so it can be passed to the API widget
+    btn_create_output = tk.Button(
+        root, text="Create Report", command=generate_report_csv, state=tk.DISABLED
+    )
+
+    make_api_key_widgets(root, btn_create_output)
     make_calender_elements(root)
 
     # Separator line
     tk.Frame(root, height=1, bg="grey").pack(fill="x", padx=20, pady=5)
-    #generate report on click
-    btn_create_output = tk.Button(root, text="Create Report", command=generate_report_csv)
+    # Generate report on click (button created earlier, just pack it here)
     btn_create_output.pack(pady=15)
 
     # Centre the window on screen after all widgets are packed
