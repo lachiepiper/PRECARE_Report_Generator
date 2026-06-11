@@ -11,16 +11,16 @@ import csv
 import requests
 import io
 
-
+#placeholder
+output_path = "/Users/lachiepiper/Desktop/ECMO/ECMO\ Application/OUTPUT\ TESTS"
 # Global variables
 df = None
-output_path = None
 filename = "PRECARE_activity_report.csv"
 date_from = date(1900, 1, 1)
 date_to = date(1900, 1, 1)
 # REDCap credentials
 API_URL = "https://redcap.ohmr.health.nsw.gov.au/redcap_v16.1.5/index.php?pid=2145"  # PRECARE REDCap instance URL
-API_TOKEN = "YOUR_API_TOKEN_HERE"                      # From REDCap > API > Generate Token
+API_TOKEN = ""                      # From REDCap > API > Generate Token
 
 
 def resource_path(filename):
@@ -35,15 +35,13 @@ def resource_path(filename):
         # Running as a normal script
         return os.path.join(os.path.dirname(__file__), filename)
 
-def REDCAP_Data():
+def REDCAP_API_Request():
     global df
     # Use the globally set API credentials
-    api_url = API_URL
-    api_token = API_TOKEN
-
+    global API_URL, API_TOKEN
     # Set up the payload parameters
     payload = {
-        'token': api_token,
+        'token': API_TOKEN,
         'content': 'record',
         'format': 'csv',
         'type': 'flat',
@@ -53,7 +51,15 @@ def REDCAP_Data():
         'returnFormat': 'json'}
 
     # Make the API request
-    response = requests.post(api_url, data=payload)
+    try:
+        response = requests.post(api_url, data=payload, timeout=30)
+    except requests.exceptions.RequestException as e:
+        print(f"Connection error: {e}")
+        messagebox.showerror(
+            "Connection Error",
+            "Please check your internet connection"
+        )
+        return
 
     # Save the response text to a CSV file if successful
     if response.status_code == 200:
@@ -63,6 +69,10 @@ def REDCAP_Data():
         print(df.head())
     else:
         print(f"Error: {response.status_code} - {response.text}")
+        messagebox.showerror(
+            "Database Error",
+            "Unable to access database. Please check your API key."
+        )
 
 def open_calendar(title, cal_button, is_from):
     """
@@ -109,16 +119,13 @@ def open_calendar(title, cal_button, is_from):
     btn_confirm.pack(pady=(0, 10))
 
 def generate_report_csv():
-    #TODO - DEBUG this when internet working
-    # REDCAP_Data();
 
+    REDCAP_API_Request();
 
     if df is None:
-        messagebox.showwarning("No File", "Please load a CSV file first.")
+        messagebox.showwarning("No Data found")
         return
-    if output_path is None:
-        messagebox.showwarning("No Destination", "Please select an output destination first.")
-        return
+
 
     full_path = os.path.join(output_path, filename)
     write_dispatchActivity(full_path)
