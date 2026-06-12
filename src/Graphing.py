@@ -22,7 +22,7 @@ Usage
 """
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -341,10 +341,27 @@ def build_outcomes_figure(report) -> plt.Figure:
 # ── Save callback ─────────────────────────────────────────────────────────────
 
 def _save_report(fig):
-    """Save the figure to the hardcoded SAVE_PATH and show a confirmation."""
+    """Prompt the user for a save destination, then save the figure there."""
+
+    save_path = filedialog.asksaveasfilename(
+        title="Save Report As",
+        initialfile=os.path.basename(SAVE_PATH),
+        initialdir=os.path.dirname(SAVE_PATH),
+        defaultextension=".png",
+        filetypes=[
+            ("PNG Image", "*.png"),
+            ("PDF Document", "*.pdf"),
+            ("JPEG Image", "*.jpg *.jpeg"),
+            ("All Files", "*.*"),
+        ],
+    )
+
+    if not save_path:          # User cancelled the dialog
+        return
+
     try:
-        fig.savefig(SAVE_PATH, dpi=150, bbox_inches="tight", facecolor=BG)
-        messagebox.showinfo("Saved", f"Report saved to:\n{SAVE_PATH}")
+        fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor=BG)
+        messagebox.showinfo("Saved", f"Report saved to:\n{save_path}")
     except Exception as e:
         messagebox.showerror("Save Failed", f"Could not save report:\n{e}")
 

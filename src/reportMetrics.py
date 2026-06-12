@@ -21,6 +21,7 @@ def dispatchActivity(date_from, date_to, df):
     time_list_000CallToArrival = []
     for index, row in df.iterrows():
         #handle empty date times
+        print(f"date_time_incident = {row['date_time_incident']}")
         if pd.isna(row['date_time_incident']):
             #take the earliest time, either time of incidence or, if empty, time of dispatch
             first_contact_time = row['dispatch_date_time']

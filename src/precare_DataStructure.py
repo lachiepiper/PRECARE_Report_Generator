@@ -317,13 +317,43 @@ class PrecareReport:
         m, s = map(int, mmss.split(":"))
         return m + s/60
 
-    def parse_time_ranges(self, timerange):
-        """ takes a string in form MM:SS (MM:SS - MM:SS) and returns its
-        constituant parts (median, low, high) as a list of minute values """
-        med = self.to_min(timerange[0:5])
-        min = self.to_min(timerange[7:12])
-        max = self.to_min(timerange[15:20])
-        return [med, min, max]
+def parse_time_range(time_str: str) -> list[int]:
+    """
+    Parses a string in the format "MM:SS (MM:SS - MM:SS)" into a list of
+    total minutes [median, low, high].
+
+    Handles single-digit minute values (e.g. "9:30" or "09:30").
+
+    Args:
+        time_str: e.g. "12:30 (9:00 - 15:45)"
+
+    Returns:
+        [median_minutes, low_minutes, high_minutes] as ints
+
+    Raises:
+        ValueError: if the string doesn't match the expected format
+    """
+    import re
+
+    pattern = r"^\s*(\d{1,2}):(\d{2})\s*\(\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*\)\s*$"
+    match = re.match(pattern, time_str.strip())
+
+    if not match:
+        raise ValueError(
+            f"Invalid format: '{time_str}'. Expected 'MM:SS (MM:SS - MM:SS)'."
+        )
+
+    median_m, median_s, low_m, low_s, high_m, high_s = (int(x) for x in match.groups())
+
+    for label, minutes, seconds in [
+        ("median", median_m, median_s),
+        ("low",    low_m,    low_s),
+        ("high",   high_m,   high_s),
+    ]:
+        if not (0 <= seconds <= 59):
+            raise ValueError(f"Invalid seconds value in {label}: {seconds}")
+
+    return [median_m, low_m, high_m]
 
     def parse_percentages(self, string):
         """takes a string in the form X (Y.00%) and returns string X and float Y
@@ -1039,5 +1069,5 @@ class PrecareReport:
         instance = cls(
             custom_dates_present=custom_dates,
             date_range_label=date_range_label if custom_dates else None,
-        )
+                )
         return instance
