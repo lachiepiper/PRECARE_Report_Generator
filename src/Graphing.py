@@ -486,8 +486,6 @@ def _draw_art_line_time(ax, report):
     ax.spines["right"].set_visible(False)
 
 
-
-
 # ═════════════════════════════════════════════════════════════════════════════
 # SAVE CHART FUNCTION
 # ═════════════════════════════════════════════════════════════════════════════
@@ -500,6 +498,7 @@ def _save_chart(figure):
     """
     file_path = filedialog.asksaveasfilename(
         title="Save PRECARE Outcomes Chart",
+        initialfile="PRECARE Report Data"
         defaultextension=".png",
         filetypes=[
             ("PNG image",        "*.png"),
@@ -645,12 +644,9 @@ def open_graph(report):
     canvas_widget.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=(0, 4))
     canvas.draw()
 
-    # ── Bottom button bar ────────────────────────────────────────────────────
-    button_frame = tk.Frame(root, bg=WINDOW_BG)
-    button_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=15, pady=(4, 10))
-
+    # ── Top Right Save Button ────────────────────────────────────────────────
     save_button = tk.Button(
-        button_frame,
+        root,
         text="💾  Save Chart",
         font=("Helvetica", 11, "bold"),
         bg="#2980B9",
@@ -663,7 +659,8 @@ def open_graph(report):
         cursor="hand2",
         command=lambda: _save_chart(figure),
     )
-    save_button.pack(side=tk.RIGHT, padx=8)
+    # Use absolute positioning so the header stays perfectly centered
+    save_button.place(relx=1.0, rely=0.0, x=-15, y=10, anchor="ne")
 
     # ── Start Tk event loop ──────────────────────────────────────────────────
     root.mainloop()
