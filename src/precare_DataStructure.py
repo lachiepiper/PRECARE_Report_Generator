@@ -327,13 +327,18 @@ class PrecareReport:
         return f"{minutes:02d}:{seconds:02d}"
 
     def parse_time_to_decimal(self, time_str: str) -> float:
-        """Convert a 'MM:SS' or 'M:SS' string to decimal minutes."""
+        """Convert a 'HH:MM:SS' or 'MM:SS' or 'M:SS' string to decimal minutes."""
         parts = time_str.strip().split(":")
-        if len(parts) != 2:
-            raise ValueError(f"Invalid time format: '{time_str}'. Expected MM:SS or M:SS.")
-        minutes = int(parts[0])
-        seconds = int(parts[1])
-        return minutes + seconds / 60
+        if len(parts) == 3:
+            minutes = int(parts[0]*60 + parts[1])
+            seconds = int(parts[2])
+            return minutes + seconds / 60
+        elif len(parts) == 2:
+            minutes = int(parts[0])
+            seconds = int(parts[1])
+            return minutes + seconds / 60
+        else:
+            raise ValueError(f"Unrecognized data format: '{time_str}'. Expected 'HH:MM:SS' or 'MM:SS' or 'M:SS' ")
 
     def parse_ecmo_ranges(self, ecmo_string: str) -> list[int]:
         """
@@ -354,29 +359,39 @@ class PrecareReport:
 
     def parse_time_ranges(self, input_str: str) -> list[float]:
         """
-        Parse a string in the format "MM:SS (MM:SS - MM:SS)" into a list of
-        decimal minute values [median, low, high].
-
-        Handles single-digit minute values (e.g. "9:30" or "09:30").
-
+        Parse a string in the format "MM:SS (MM:SS - MM:SS)" or
+        "HH:MM:SS (HH:MM:SS - HH:MM:SS)" into a list of decimal minute values
+        [median, low, high]. Both formats can be mixed within the same string.
+        Handles single-digit values (e.g. "9:30" or "09:30").
         Args:
             input_str: A string like "10:30 (9:00 - 12:15)"
-
+                       or "1:10:30 (0:09:00 - 1:12:15)"
         Returns:
             A list [median, low, high] as decimal minutes.
-
         Raises:
             ValueError: If the string does not match the expected format.
         """
         if input_str == "0 (0 - 0)":
-            return [0,0,0]
+            return [0, 0, 0]
 
-        pattern = r"^\s*(\d{1,2}:\d{2})\s*\(\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*\)\s*$"
+        # Each time token matches either HH:MM:SS or MM:SS
+        time_token = r"\d{1,2}:\d{2}(?::\d{2})?"
+
+        pattern = (
+            r"^\s*"
+            rf"({time_token})"           # median
+            r"\s*\(\s*"
+            rf"({time_token})"           # low
+            r"\s*-\s*"
+            rf"({time_token})"           # high
+            r"\s*\)\s*$"
+        )
+
         match = re.match(pattern, input_str)
-
         if not match:
             raise ValueError(
-                f"Input '{input_str}' does not match expected format 'MM:SS (MM:SS - MM:SS)'."
+                f"Input '{input_str}' does not match expected format "
+                f"'MM:SS (MM:SS - MM:SS)' or 'HH:MM:SS (HH:MM:SS - HH:MM:SS)'."
             )
 
         median_str, low_str, high_str = match.group(1), match.group(2), match.group(3)

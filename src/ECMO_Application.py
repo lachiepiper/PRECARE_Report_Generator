@@ -12,7 +12,7 @@ from typing import Optional
 import csv
 import requests
 import io
-from Graphing import open_outcomes_window
+from Graphing import open_graph
 from dataclasses import dataclass, field
 
 
@@ -165,15 +165,12 @@ def generate_report_csv():
 
     Report.to_csv(path = full_path+"DATA_STRUCTUREreport.csv")
 
-    open_outcomes_window(Report)
+    open_graph(Report)
 
 def write_dispatchActivity(csv):
     global df
     global date_from, date_to
     global Report
-
-
-    print(f"PrecareReport.custom_dates_present = {PrecareReport.custom_dates_present}")
 
     month_list = reportMetrics.dispatchActivity(
         date.today() - timedelta(days=30), date.today(), df

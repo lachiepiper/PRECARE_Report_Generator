@@ -20,12 +20,15 @@ def dispatchActivity(date_from, date_to, df):
     time_list_dispatchToDeparture = []
     time_list_000CallToArrival = []
     for index, row in df.iterrows():
+        #handle empty rows
+        if pd.isna(row['date_time_incident']) and pd.isna(row['date_time_incident']):
+            continue #no useful data in row
+
         #handle empty date times
         if pd.isna(row['date_time_incident']):
             #take the earliest time, either time of incidence or, if empty, time of dispatch
             first_contact_time = row['dispatch_date_time']
             date = parse_date_and_time(row['dispatch_date_time'])[0]
-
         else:
             first_contact_time = row['date_time_incident']
             date = parse_date_and_time(str(row['date_time_incident']))[0]
@@ -36,9 +39,9 @@ def dispatchActivity(date_from, date_to, df):
             #Number of patients with interventions
             total_interventions += checkInterventions(row)[0]
             # unsure how to calculate dispatch to arrival at this time
-            time_list_dispatchToDeparture.append(row['dispatch_to_departure'])
+            time_list_dispatchToDeparture.append(int(row['dispatch_to_departure']))
             # Median time from dispatch to arrival (just the data to be calculated later)
-            time_list_dispatchToArrival.append(row['dispatch_to_arrival_at_patient'])
+            time_list_dispatchToArrival.append(int(row['dispatch_to_arrival_at_patient']))
             #Median time from 000 call to patient (just the data to be calculated later)
             time_list_000CallToArrival.append(time_difference(parse_date_and_time(first_contact_time)[1], parse_date_and_time(row['at_patient_time'])[1]))
 
@@ -85,6 +88,10 @@ def caseClassification(date_from, date_to, df):
     total_arrests = 0
     interventions = 0
     for index, row in df.iterrows():
+        #handle empty rows
+        if pd.isna(row['date_time_incident']) and pd.isna(row['date_time_incident']):
+            continue #no useful data in row
+
         #handle empty date times
         if pd.isna(row['date_time_incident']):
             #take the earliest time, either time of incidence or, if empty, time of dispatch
@@ -126,6 +133,10 @@ def interventionsPerformed(date_from, date_to, df):
 
     intervention_count_list = []
     for index, row in df.iterrows():
+        #handle empty rows
+        if pd.isna(row['date_time_incident']) and pd.isna(row['date_time_incident']):
+            continue #no useful data in row
+
         #handle empty date times
         if pd.isna(row['date_time_incident']):
             #take the earliest time, either time of incidence or, if empty, time of dispatch
@@ -160,6 +171,10 @@ def ArtLineAnalysis(date_from, date_to, df):
     post_ROSC_Artline = 0
     PRECARE_Arrival_Time_List = []
     for index, row in df.iterrows():
+        #handle empty rows
+        if pd.isna(row['date_time_incident']) and pd.isna(row['date_time_incident']):
+            continue #no useful data in row
+
         #handle empty date times
         if pd.isna(row['date_time_incident']):
             #take the earliest time, either time of incidence or, if empty, time of dispatch
@@ -206,6 +221,10 @@ def ROSCRateAnalysis(date_from, date_to, df):
     arrest_to_ROSC_time_list = []
     ROSC_time_fromArrival_list = []
     for index, row in df.iterrows():
+        #handle empty rows
+        if pd.isna(row['date_time_incident']) and pd.isna(row['date_time_incident']):
+            continue #no useful data in row
+
         #handle empty date times
         if pd.isna(row['date_time_incident']):
             #take the earliest time, either time of incidence or, if empty, time of dispatch
@@ -503,6 +522,7 @@ def analyse_times(time_list):
         Accepts either "MM:SS" format or a plain integer string.
         Returns None if the entry is invalid.
         """
+        hours = 0
         # Case 1 — "MM:SS" format
         if ":" in str_entry:
             parts = str_entry.split(":")
@@ -524,11 +544,10 @@ def analyse_times(time_list):
             except ValueError:
                 return None
 
-    def to_mm_ss(total_secs):
-        """Converts total seconds back to a MM:SS string."""
-        mins = total_secs // 60
-        secs = total_secs % 60
-        return f"{mins:02d}:{secs:02d}"
+    def seconds_to_hhmmss(total_seconds: int) -> str:
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{hours:02}:{minutes:02}:{seconds:02}"
 
     # --- Build a clean list of valid times in seconds ---
     valid_seconds = []
@@ -548,7 +567,7 @@ def analyse_times(time_list):
         # Attempt to convert to seconds
         seconds = to_seconds(str_entry)
         if seconds is None:
-            print(f"  Skipping malformed entry: '{str_entry}'")
+            print(f" Skipping malformed entry: '{str_entry}'")
             continue
 
         valid_seconds.append(seconds)
@@ -559,8 +578,8 @@ def analyse_times(time_list):
         return None
 
     # --- Calculate min and max ---
-    minimum = to_mm_ss(min(valid_seconds))
-    maximum = to_mm_ss(max(valid_seconds))
+    minimum = seconds_to_hhmmss(min(valid_seconds))
+    maximum = seconds_to_hhmmss(max(valid_seconds))
 
     # --- Calculate median ---
     sorted_seconds = sorted(valid_seconds)
@@ -572,7 +591,7 @@ def analyse_times(time_list):
     else:
         median_seconds = (sorted_seconds[midpoint - 1] + sorted_seconds[midpoint]) // 2
 
-    median = to_mm_ss(median_seconds)
+    median = seconds_to_hhmmss(median_seconds)
 
     return {
         "median": median,
