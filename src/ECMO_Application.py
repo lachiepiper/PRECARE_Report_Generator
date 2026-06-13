@@ -45,7 +45,6 @@ def choose_file():
         filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
     )
     #debug
-    file_path = "/Users/lachiepiper/Desktop/ECMO/ECMO Application/assets/PRECARE_DATA_2026-05-11_1023.csv"
     print(f"choosing file: {file_path}") #DEBUG
 
     if file_path:

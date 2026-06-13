@@ -21,7 +21,6 @@ def dispatchActivity(date_from, date_to, df):
     time_list_000CallToArrival = []
     for index, row in df.iterrows():
         #handle empty date times
-        print(f"date_time_incident = {row['date_time_incident']}")
         if pd.isna(row['date_time_incident']):
             #take the earliest time, either time of incidence or, if empty, time of dispatch
             first_contact_time = row['dispatch_date_time']
@@ -49,9 +48,9 @@ def dispatchActivity(date_from, date_to, df):
         dispatch_dep_Min = dispatch_to_departure['min']
         dispatch_dep_Max = dispatch_to_departure['max']
     else:
-        dispatch_dep_Med = "0"
-        dispatch_dep_Min = "0"
-        dispatch_dep_Max = "0"
+        dispatch_dep_Med = "00:00"
+        dispatch_dep_Min = "00:00"
+        dispatch_dep_Max = "00:00"
 
     if len(time_list_dispatchToArrival) > 0:
         dispatch_to_arrival = analyse_times(time_list_dispatchToArrival)
@@ -59,9 +58,9 @@ def dispatchActivity(date_from, date_to, df):
         dispatch_arr_Min = dispatch_to_arrival['min']
         dispatch_arr_Max = dispatch_to_arrival['max']
     else:
-        dispatch_arr_Med = "0"
-        dispatch_arr_Min = "0"
-        dispatch_arr_Max = "0"
+        dispatch_arr_Med = "00:00"
+        dispatch_arr_Min = "00:00"
+        dispatch_arr_Max = "00:00"
 
     if len(time_list_000CallToArrival) > 0:
         _000CallToArrival = analyse_times(time_list_000CallToArrival)
@@ -99,13 +98,13 @@ def caseClassification(date_from, date_to, df):
         if (dateObject.date() > date_from) and (dateObject.date() < date_to):
             if is_datetime(row["arrest_time"]):
                 total_arrests += 1
-                if checkInterventions(row):
+                if checkInterventions(row)[0]:
                     interventions += 1
 
     if total_arrests > 0:
         percentage = (interventions/total_arrests) * 100
         return [f"{total_arrests} ({percentage:.2f}%)"]
-    else: return [f"0 (0%)"]
+    else: return ["0 (0%)"]
 
 def interventionsPerformed(date_from, date_to, df):
     #precalculated intervention count list precalculated during dispatchActivity
@@ -139,7 +138,12 @@ def interventionsPerformed(date_from, date_to, df):
         #collect data from within relevent dates
         if (dateObject.date() > date_from) and (dateObject.date() < date_to):
             row_interventions = checkInterventions(row)[1]
+
             for key, value in row_interventions.items():
+                if key == "PRECARE Access ( IO / IV / Central)":
+                    intervention_count[key][0] += row_interventions[key][0]
+                    intervention_count[key][1] += row_interventions[key][1]
+                    intervention_count[key][2] += row_interventions[key][2]
                 intervention_count[key] += row_interventions[key]
 
     for key, value in intervention_count.items():
@@ -213,7 +217,10 @@ def ROSCRateAnalysis(date_from, date_to, df):
 
         #collect data from within relevent dates
         if (dateObject.date() > date_from) and (dateObject.date() < date_to):
-            total_patients += 1
+            if is_datetime(row["arrest_time"]):
+                total_patients += 1
+            else: continue #if no arrest then row is irrelevant
+
             if is_one(row["any_rosc"]):
                 any_ROSC += 1
             if is_numeric(row["arrest_time_to_rosc"]):
@@ -222,15 +229,17 @@ def ROSCRateAnalysis(date_from, date_to, df):
                 sustained_ROSC += 1
             if is_zero(row["sustained_rosc"]):
                 never_sustained_ROSC += 1
-            if row["rosc_prior_arrival"] == "Before":
-                ROSC_prior_arrival += 1
-            elif row["rosc_prior_arrival"] == "On/After":
-                ROSC_onAfter_arrival += 1
+            if row["rosc_prior_arrival"] == 1:
+                ROSC_Before_arrival += 1
+            elif row["rosc_prior_arrival"] == 0:
+                ROSC_OnAfter_arrival += 1
                 if is_numeric(row["rosc_time_fromarrival_calc_2"]):
                     ROSC_time_fromArrival_list.append(int(row["rosc_time_fromarrival_calc_2"]))
-            if row["ecmo_cannulation_commenced"]:
+            if is_one(row["ecmo_cannulation_commenced"]):
+                print("cannula found")
                 ECMO_commenced += 1
                 if is_one(row["success_cann"]):
+                    print("success cannual")
                     successful_cannulation += 1
 
     try:
@@ -373,6 +382,7 @@ def checkInterventions(row):
         elif access_type == 3:
             intervention_count["PRECARE Access ( IO / IV / Central)"][2] += 1
 
+
     if is_one(row[index_echo]):
         intervention_count["Echo / Ultrasound"] += 1
         intervention = True
@@ -389,6 +399,10 @@ def checkInterventions(row):
         intervention_count["POC testing ABG"] += 1
         intervention = True
 
+    if is_one(row[index_assisted_ETT]):
+        intervention_count["Assisted ETT"] += 1
+        intervention = True
+
     return [intervention, intervention_count]
 
 def access_present(value):
@@ -400,7 +414,7 @@ def access_present(value):
 def is_one(value):
     if str(value) == "" or str(value).lower() == "nan":
         return False
-    else: return int(value) == 1
+    else: return value == 1
 
 def is_zero(value):
     if str(value) == "" or str(value).lower() == "nan":
@@ -462,7 +476,7 @@ def average_time(time_list):
         print("No valid time entries found.")
         return None
 
-    # Calculate the average in minutes and convert back to HH:MM
+    # Calculate the average in minutes and convert back to MM:SS
     average_minutes = total_minutes // valid_count
     avg_hours = average_minutes // 60
     avg_mins = average_minutes % 60

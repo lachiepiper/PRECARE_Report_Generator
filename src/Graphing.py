@@ -22,7 +22,7 @@ Usage
 """
 
 import tkinter as tk
-from tkinter import messagebox, filedialog
+from tkinter import messagebox
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -70,56 +70,54 @@ def _safe(val, fallback=0):
 
 def _draw_rosc_tally(ax, report):
     """
-    Horizontal stacked bar showing ROSC breakdown for 30d and 90d.
-    Segments: ROSC achieved vs not achieved, sized proportionally to total arrests.
+    Grouped bar chart showing ROSC rates for 30d and 90d side by side.
+    Shows any ROSC and sustained ROSC (>20 min) as percentages,
+    with the raw fraction labelled above each bar.
     """
-    periods = [
-        ("30 Days",
-         _safe(report.rosc_any_num_30d),
-         _safe(report.rosc_any_den_30d)),
-        ("90 Days",
-         _safe(report.rosc_any_num_90d),
-         _safe(report.rosc_any_den_90d)),
-    ]
+    categories = ["Any ROSC", "Sustained ROSC\n(>20 min)"]
 
-    bar_h = 0.35
-    y_pos = [0, 0.6]
+    # Percentages
+    any_pct_30     = _safe(report.rosc_any_pct_30d)
+    any_pct_90     = _safe(report.rosc_any_pct_90d)
+    sus_pct_30     = _safe(report.rosc_sustained_pct_30d)
+    sus_pct_90     = _safe(report.rosc_sustained_pct_90d)
 
-    for i, (label, achieved, total) in enumerate(periods):
-        not_achieved = max(total - achieved, 0)
-        ax.barh(y_pos[i], achieved,    bar_h, color=C_YES,     zorder=3)
-        ax.barh(y_pos[i], not_achieved, bar_h, left=achieved,   color=C_NO, zorder=3)
+    # Raw fractions for labels
+    any_frac_30    = f"{_safe(report.rosc_any_num_30d)}/{_safe(report.rosc_any_den_30d)}"
+    any_frac_90    = f"{_safe(report.rosc_any_num_90d)}/{_safe(report.rosc_any_den_90d)}"
+    sus_frac_30    = f"{_safe(report.rosc_sustained_num_30d)}/{_safe(report.rosc_sustained_den_30d)}"
+    sus_frac_90    = f"{_safe(report.rosc_sustained_num_90d)}/{_safe(report.rosc_sustained_den_90d)}"
 
-        pct = (achieved / total * 100) if total > 0 else 0
-        ax.text(-0.3, y_pos[i], label,
-                ha="right", va="center", fontsize=9,
+    vals_30 = [any_pct_30, sus_pct_30]
+    vals_90 = [any_pct_90, sus_pct_90]
+    fracs_30 = [any_frac_30, sus_frac_30]
+    fracs_90 = [any_frac_90, sus_frac_90]
+
+    x = np.arange(len(categories))
+    w = 0.32
+
+    b30 = ax.bar(x - w/2, vals_30, w, color=C30, zorder=3, label="Last 30 Days")
+    b90 = ax.bar(x + w/2, vals_90, w, color=C90, zorder=3, label="Last 90 Days")
+
+    # Label each bar with percentage on top and fraction just above that
+    for bar, pct, frac in zip(list(b30), vals_30, fracs_30):
+        ax.text(bar.get_x() + bar.get_width() / 2, pct + 1.5,
+                f"{pct:.0f}%\n({frac})",
+                ha="center", va="bottom", fontsize=8,
                 fontweight="bold", color=TEXT_COL)
-        ax.text(total + 0.1, y_pos[i],
-                f"{achieved}/{total}  ({pct:.0f}%)",
-                ha="left", va="center", fontsize=8, color=TEXT_COL)
 
-    ax.set_xlim(-1, max(
-        _safe(report.rosc_any_den_30d, 1),
-        _safe(report.rosc_any_den_90d, 1)) * 1.45)
-    ax.set_ylim(-0.3, 1.0)
-    ax.set_yticks([])
-    ax.xaxis.grid(True, color=GRID_COL, linewidth=0.7, zorder=0)
-    ax.yaxis.grid(False)
-    ax.set_axisbelow(True)
-    ax.set_facecolor(PANEL_BG)
-    ax.set_title("ROSC Rate", fontsize=10, fontweight="bold",
-                 color=TEXT_COL, pad=8)
-    ax.set_xlabel("Number of patients", fontsize=8, color=TEXT_COL)
-    for spine in ("top", "right", "left"):
-        ax.spines[spine].set_visible(False)
-    ax.spines["bottom"].set_color(GRID_COL)
+    for bar, pct, frac in zip(list(b90), vals_90, fracs_90):
+        ax.text(bar.get_x() + bar.get_width() / 2, pct + 1.5,
+                f"{pct:.0f}%\n({frac})",
+                ha="center", va="bottom", fontsize=8,
+                fontweight="bold", color=TEXT_COL)
 
-    legend = [
-        mpatches.Patch(color=C_YES, label="ROSC achieved"),
-        mpatches.Patch(color=C_NO,  label="No ROSC"),
-    ]
-    ax.legend(handles=legend, fontsize=7, loc="lower right",
-              framealpha=0.8, edgecolor=GRID_COL)
+    ax.set_xticks(x)
+    ax.set_xticklabels(categories, fontsize=9)
+    ax.set_ylim(0, 130)
+    ax.set_ylabel("Percentage (%)", fontsize=8, color=TEXT_COL)
+    ax.legend(fontsize=8, framealpha=0.9, edgecolor=GRID_COL)
+    _style(ax, "ROSC Rates")
 
 
 def _draw_pie(ax, achieved, total, title, color_yes=C_YES, color_no=C_NO):
@@ -252,84 +250,59 @@ def build_outcomes_figure(report) -> plt.Figure:
 
     # Row 1 ───────────────────────────────────────────────────────────────────
     # Calculate denominators for the pie charts
-    # "before PRECARE" expressed as % of total cardiac arrests
-    total_30 = _safe(report.cardiac_arrests_30d, 1)
-    total_90 = _safe(report.cardiac_arrests_90d, 1)
-
+    # Values for the three ROSC outcome segments
+    never_30  = _safe(report.rosc_never_30d)
     before_30 = _safe(report.rosc_before_precare_30d)
-    before_90 = _safe(report.rosc_before_precare_90d)
     after_30  = _safe(report.rosc_on_after_precare_30d)
+
+    never_90  = _safe(report.rosc_never_90d)
+    before_90 = _safe(report.rosc_before_precare_90d)
     after_90  = _safe(report.rosc_on_after_precare_90d)
 
-    # Pie: ROSC before PRECARE — column 0
-    ax_pie1 = fig.add_subplot(gs[1, 0])
-    sizes   = [before_30, before_90, max(total_90 - before_30 - before_90, 0)]
-    if sum(sizes) > 0:
-        wedges, _, autotexts = ax_pie1.pie(
-            sizes,
-            colors=[C30, C90, C_NEUTRAL],
-            autopct=lambda p: f"{p:.0f}%" if p > 4 else "",
-            startangle=90,
-            wedgeprops={"linewidth": 1.5, "edgecolor": BG},
-            textprops={"fontsize": 9, "color": "white", "fontweight": "bold"},
-        )
-        for at in autotexts:
-            at.set_color("white")
-            at.set_fontweight("bold")
-        ax_pie1.legend(
-            wedges,
-            [f"Last 30 Days  ({before_30} patients)",
-             f"Last 90 Days  ({before_90} patients)",
-             f"No ROSC before arrival  ({max(total_90 - before_30 - before_90, 0)} patients)"],
-            loc="lower center",
-            bbox_to_anchor=(0.5, -0.22),
-            fontsize=7.5,
-            framealpha=0.9,
-            edgecolor=GRID_COL,
-            ncol=1,
-        )
-    else:
-        ax_pie1.text(0.5, 0.5, "No data", ha="center", va="center",
-                     transform=ax_pie1.transAxes, fontsize=9, color=TEXT_COL)
-        ax_pie1.axis("off")
-    ax_pie1.set_title("ROSC Before\nPRECARE Arrival",
-                      fontsize=10, fontweight="bold", color=TEXT_COL, pad=8)
-    ax_pie1.set_facecolor(PANEL_BG)
+    pie_colors  = [C_NO, C30, C_YES]   # never=red, before=blue, on/after=green
+    pie_labels  = ["Never achieved ROSC", "ROSC before PRECARE", "ROSC on/after PRECARE"]
 
-    # Pie: ROSC on/after PRECARE — column 1
+    def _draw_rosc_pie(ax, never, before, after, title):
+        sizes = [never, before, after]
+        total = sum(sizes)
+        if total > 0:
+            wedges, _, autotexts = ax.pie(
+                sizes,
+                colors=pie_colors,
+                autopct=lambda p: f"{p:.0f}%" if p > 4 else "",
+                startangle=90,
+                wedgeprops={"linewidth": 1.5, "edgecolor": BG},
+                textprops={"fontsize": 9, "color": "white", "fontweight": "bold"},
+            )
+            for at in autotexts:
+                at.set_color("white")
+                at.set_fontweight("bold")
+            ax.legend(
+                wedges,
+                [f"{pie_labels[0]}  ({never})",
+                 f"{pie_labels[1]}  ({before})",
+                 f"{pie_labels[2]}  ({after})"],
+                loc="lower center",
+                bbox_to_anchor=(0.5, -0.22),
+                fontsize=7.5,
+                framealpha=0.9,
+                edgecolor=GRID_COL,
+                ncol=1,
+            )
+        else:
+            ax.text(0.5, 0.5, "No data", ha="center", va="center",
+                    transform=ax.transAxes, fontsize=9, color=TEXT_COL)
+            ax.axis("off")
+        ax.set_title(title, fontsize=10, fontweight="bold", color=TEXT_COL, pad=8)
+        ax.set_facecolor(PANEL_BG)
+
+    # Pie: 30 day ROSC breakdown — column 0
+    ax_pie1 = fig.add_subplot(gs[1, 0])
+    _draw_rosc_pie(ax_pie1, never_30, before_30, after_30, "ROSC Outcome\nLast 30 Days")
+
+    # Pie: 90 day ROSC breakdown — column 1
     ax_pie2 = fig.add_subplot(gs[1, 1])
-    sizes2  = [after_30, after_90, max(total_90 - after_30 - after_90, 0)]
-    if sum(sizes2) > 0:
-        wedges2, _, autotexts2 = ax_pie2.pie(
-            sizes2,
-            colors=[C30, C90, C_NEUTRAL],
-            autopct=lambda p: f"{p:.0f}%" if p > 4 else "",
-            startangle=90,
-            wedgeprops={"linewidth": 1.5, "edgecolor": BG},
-            textprops={"fontsize": 9, "color": "white", "fontweight": "bold"},
-        )
-        for at in autotexts2:
-            at.set_color("white")
-            at.set_fontweight("bold")
-        ax_pie2.legend(
-            wedges2,
-            [f"Last 30 Days  ({after_30} patients)",
-             f"Last 90 Days  ({after_90} patients)",
-             f"No ROSC on/after arrival  ({max(total_90 - after_30 - after_90, 0)} patients)"],
-            loc="lower center",
-            bbox_to_anchor=(0.5, -0.22),
-            fontsize=7.5,
-            framealpha=0.9,
-            edgecolor=GRID_COL,
-            ncol=1,
-        )
-    else:
-        ax_pie2.text(0.5, 0.5, "No data", ha="center", va="center",
-                     transform=ax_pie2.transAxes, fontsize=9, color=TEXT_COL)
-        ax_pie2.axis("off")
-    ax_pie2.set_title("ROSC On/After\nPRECARE Arrival",
-                      fontsize=10, fontweight="bold", color=TEXT_COL, pad=8)
-    ax_pie2.set_facecolor(PANEL_BG)
+    _draw_rosc_pie(ax_pie2, never_90, before_90, after_90, "ROSC Outcome\nLast 90 Days")
 
     # Art line time — column 2
     ax_alt = fig.add_subplot(gs[1, 2])
@@ -341,27 +314,10 @@ def build_outcomes_figure(report) -> plt.Figure:
 # ── Save callback ─────────────────────────────────────────────────────────────
 
 def _save_report(fig):
-    """Prompt the user for a save destination, then save the figure there."""
-
-    save_path = filedialog.asksaveasfilename(
-        title="Save Report As",
-        initialfile=os.path.basename(SAVE_PATH),
-        initialdir=os.path.dirname(SAVE_PATH),
-        defaultextension=".png",
-        filetypes=[
-            ("PNG Image", "*.png"),
-            ("PDF Document", "*.pdf"),
-            ("JPEG Image", "*.jpg *.jpeg"),
-            ("All Files", "*.*"),
-        ],
-    )
-
-    if not save_path:          # User cancelled the dialog
-        return
-
+    """Save the figure to the hardcoded SAVE_PATH and show a confirmation."""
     try:
-        fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor=BG)
-        messagebox.showinfo("Saved", f"Report saved to:\n{save_path}")
+        fig.savefig(SAVE_PATH, dpi=150, bbox_inches="tight", facecolor=BG)
+        messagebox.showinfo("Saved", f"Report saved to:\n{SAVE_PATH}")
     except Exception as e:
         messagebox.showerror("Save Failed", f"Could not save report:\n{e}")
 

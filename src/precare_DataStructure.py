@@ -28,6 +28,7 @@ from __future__ import annotations
 import csv
 import io
 import pandas as pd
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -317,43 +318,74 @@ class PrecareReport:
         m, s = map(int, mmss.split(":"))
         return m + s/60
 
-def parse_time_range(time_str: str) -> list[int]:
-    """
-    Parses a string in the format "MM:SS (MM:SS - MM:SS)" into a list of
-    total minutes [median, low, high].
+    def to_mmss(self, time_str: str) -> str:
+        if ":" in time_str:
+            return time_str  # already in MM:SS format
+        total_seconds = round(float(time_str) * 60)
+        minutes = total_seconds // 60
+        seconds = total_seconds % 60
+        return f"{minutes:02d}:{seconds:02d}"
 
-    Handles single-digit minute values (e.g. "9:30" or "09:30").
+    def parse_time_to_decimal(self, time_str: str) -> float:
+        """Convert a 'MM:SS' or 'M:SS' string to decimal minutes."""
+        parts = time_str.strip().split(":")
+        if len(parts) != 2:
+            raise ValueError(f"Invalid time format: '{time_str}'. Expected MM:SS or M:SS.")
+        minutes = int(parts[0])
+        seconds = int(parts[1])
+        return minutes + seconds / 60
 
-    Args:
-        time_str: e.g. "12:30 (9:00 - 15:45)"
+    def parse_ecmo_ranges(self, ecmo_string: str) -> list[int]:
+        """
+        Parses a clinical data string formatted as 'A (B)'
+        and returns a list of integers [A, B].
+        """
+        # Split the string at the opening parenthesis
+        parts = ecmo_string.split('(')
 
-    Returns:
-        [median_minutes, low_minutes, high_minutes] as ints
+        if len(parts) == 2:
+            # Clean up whitespace and the closing parenthesis, then cast to integers
+            primary_val = int(parts[0].strip())
+            secondary_val = int(parts[1].replace(')', '').strip())
 
-    Raises:
-        ValueError: if the string doesn't match the expected format
-    """
-    import re
+            return [primary_val, secondary_val]
+        else:
+            raise ValueError(f"Unrecognized data format: '{ecmo_string}'. Expected 'A (B)'.")
 
-    pattern = r"^\s*(\d{1,2}):(\d{2})\s*\(\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*\)\s*$"
-    match = re.match(pattern, time_str.strip())
+    def parse_time_ranges(self, input_str: str) -> list[float]:
+        """
+        Parse a string in the format "MM:SS (MM:SS - MM:SS)" into a list of
+        decimal minute values [median, low, high].
 
-    if not match:
-        raise ValueError(
-            f"Invalid format: '{time_str}'. Expected 'MM:SS (MM:SS - MM:SS)'."
-        )
+        Handles single-digit minute values (e.g. "9:30" or "09:30").
 
-    median_m, median_s, low_m, low_s, high_m, high_s = (int(x) for x in match.groups())
+        Args:
+            input_str: A string like "10:30 (9:00 - 12:15)"
 
-    for label, minutes, seconds in [
-        ("median", median_m, median_s),
-        ("low",    low_m,    low_s),
-        ("high",   high_m,   high_s),
-    ]:
-        if not (0 <= seconds <= 59):
-            raise ValueError(f"Invalid seconds value in {label}: {seconds}")
+        Returns:
+            A list [median, low, high] as decimal minutes.
 
-    return [median_m, low_m, high_m]
+        Raises:
+            ValueError: If the string does not match the expected format.
+        """
+        if input_str == "0 (0 - 0)":
+            return [0,0,0]
+
+        pattern = r"^\s*(\d{1,2}:\d{2})\s*\(\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*\)\s*$"
+        match = re.match(pattern, input_str)
+
+        if not match:
+            raise ValueError(
+                f"Input '{input_str}' does not match expected format 'MM:SS (MM:SS - MM:SS)'."
+            )
+
+        median_str, low_str, high_str = match.group(1), match.group(2), match.group(3)
+
+        median = self.parse_time_to_decimal(median_str)
+        low    = self.parse_time_to_decimal(low_str)
+        high   = self.parse_time_to_decimal(high_str)
+
+        return [median, low, high]
 
     def parse_percentages(self, string):
         """takes a string in the form X (Y.00%) and returns string X and float Y
@@ -493,7 +525,6 @@ def parse_time_range(time_str: str) -> list[int]:
 
         month_list = df["Last 30 Days"]
         three_month_list = df["Last 90 Days"]
-        print(f"month list = {month_list}\n3 month list = {three_month_list}")
 
         self.rsi_30d = int(month_list[0])
         self.rsi_90d = int(three_month_list[0])
@@ -576,7 +607,7 @@ def parse_time_range(time_str: str) -> list[int]:
 
     def set_ROSC_rates(self, df: pd.dataframe):
         """Sets ROSC rate data based on a dataframe of format:
-                "ROSC Rates":["Number of patients who achieved ROSC at any time",
+                "ROSC Rates":"Number of patients who achieved ROSC at any time",
                 "Median time of arrest to time of ROSC (range)",
                 "Number of patients who achieved sustained ROSC >20mins",
                 "Sustained ROSC gained:	never",
@@ -686,22 +717,22 @@ def parse_time_range(time_str: str) -> list[int]:
         self.rosc_on_after_precare_90d = int(three_month_list[5])
 
         # Median time from PRECARE arrival to ROSC (decimal minutes)
-        list = parse_integer_ranges(month_list[7])
+        list = self.parse_time_ranges(month_list[7])
         self.precare_arrival_to_rosc_30d = list[0]
         self.precare_arrival_to_rosc_30d_low = list[1]
         self.precare_arrival_to_rosc_30d_high = list[2]
 
-        list = parse_integer_ranges(three_month_list[7])
+        list = self.parse_time_ranges(three_month_list[7])
         self.precare_arrival_to_rosc_90d = list[0]
         self.precare_arrival_to_rosc_90d_low = list[1]
         self.precare_arrival_to_rosc_90d_high = list[2]
 
         # ECMO cannulation (commenced / successful)
-        list = parse_ecmo_ranges(month_list[8])
+        list = self.parse_ecmo_ranges(month_list[8])
         self.ecmo_commenced_30d = list[0]
         self.ecmo_successful_30d = list[1]
 
-        list = parse_ecmo_ranges(three_month_list[8])
+        list = self.parse_ecmo_ranges(three_month_list[8])
         self.ecmo_commenced_90d = list[0]
         self.ecmo_successful_90d = list[1]
 
