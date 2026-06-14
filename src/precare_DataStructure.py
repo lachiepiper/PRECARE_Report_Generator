@@ -357,17 +357,18 @@ class PrecareReport:
 
     def parse_time_to_decimal(self, time_str: str) -> float:
         """Convert a 'HH:MM:SS' or 'MM:SS' or 'M:SS' string to decimal minutes."""
-        parts = time_str.strip().split(":")
+        parts = time_str.strip().split(':')
+
         if len(parts) == 3:
-            minutes = int(parts[0]*60 + parts[1])
-            seconds = int(parts[2])
-            return minutes + seconds / 60
+            hours, minutes, seconds = int(parts[0]), int(parts[1]), int(parts[2])
+            total_minutes = hours * 60 + minutes + seconds / 60
         elif len(parts) == 2:
-            minutes = int(parts[0])
-            seconds = int(parts[1])
-            return minutes + seconds / 60
+            minutes, seconds = int(parts[0]), int(parts[1])
+            total_minutes = minutes + seconds / 60
         else:
-            raise ValueError(f"Unrecognized data format: '{time_str}'. Expected 'HH:MM:SS' or 'MM:SS' or 'M:SS' ")
+            raise ValueError(f"Invalid time format: '{time_str}'. Expected 'HH:MM:SS', 'MM:SS', or 'M:SS'.")
+
+        return total_minutes
 
     def parse_ecmo_ranges(self, ecmo_string: str) -> list[int]:
         """
@@ -430,6 +431,7 @@ class PrecareReport:
         high   = self.parse_time_to_decimal(high_str)
 
         return [median, low, high]
+
 
     def parse_percentages(self, string):
         """takes a string in the form X (Y.00%) and returns string X and float Y
@@ -812,7 +814,7 @@ class PrecareReport:
         self.ROSC_on_Arrival_Hospital = month_list[9]
         self.ROSC_on_Arrival_Hospital = three_month_list[9]
 
-    def set_DischarchStatus(self, df:pd.dataframe):
+    def set_DischargeStatus(self, df:pd.dataframe):
         if self.custom_dates_present:
             self.discharged_alive_range =int(df.iloc[0,3])
 

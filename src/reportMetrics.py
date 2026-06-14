@@ -48,9 +48,7 @@ def dispatchActivity(date_from, date_to, df):
             total_cases_attended += 1
             #count interventions on non arrent patients
             if row["not_in_cardiac_arrest"] == 0:
-                print(f"non cardiac arrest patient identified {date}")
                 non_arrest += 1
-                print(f"nonarrest = {non_arrest}")
                 non_arrest_interventions += checkInterventions(row)[0]
             # count number of ECPR patients (defined as flow achieved)
             if is_datetime(row["cann_complete_date_time"]):
@@ -95,6 +93,12 @@ def dispatchActivity(date_from, date_to, df):
         _000CallMin = "0"
         _000CallMmax = "0"
 
+    #handle div0 exceptions
+    if non_arrest:
+        non_arrest_intervention_perc = non_arrest_interventions/non_arrest
+    else:
+        non_arrest_intervention_perc = 0
+
     return [total_interventions,
             f"{dispatch_dep_Med} " +
                 '(' + f"{dispatch_dep_Min}" + ' - ' + f"{dispatch_dep_Max}" + ')',
@@ -103,7 +107,7 @@ def dispatchActivity(date_from, date_to, df):
             f"{_000CallMed} " +
                 "(" + f"{_000CallMin}" + " - " + f"{_000CallMmax}" + ")",
             str(total_cases_attended),
-            f"{non_arrest_interventions}/{non_arrest} ({(non_arrest_interventions/non_arrest)*100:.2f}%)",
+            f"{non_arrest_interventions}/{non_arrest} ({(non_arrest_intervention_perc)*100:.2f}%)",
             str(successful_ECPR_count)
             ]
 
@@ -280,7 +284,6 @@ def ROSCRateAnalysis(date_from, date_to, df):
             else: continue #if no arrest then row is irrelevant
             #new for nat
             if row["pre_icu_initial_rhythm"] == 5:
-                print(f"ROSC before arrival found {date}") #defined as systole on arrival
                 ROSC_on_Arrival_Hospital += 1
 
             if is_one(row["any_rosc"]):
@@ -298,10 +301,8 @@ def ROSCRateAnalysis(date_from, date_to, df):
                 if is_numeric(row["rosc_time_fromarrival_calc_2"]):
                     ROSC_time_fromArrival_list.append(int(row["rosc_time_fromarrival_calc_2"]))
             if is_one(row["ecmo_cannulation_commenced"]):
-                print("cannula found")
                 ECMO_commenced += 1
             if is_one(row["success_cann"]):
-                print("success cannual")
                 successful_cannulation += 1
 
     try:

@@ -25,6 +25,12 @@ date_from = date(1900, 1, 1)
 date_to = date(1900, 1, 1)
 SaveCSV = False
 
+def show_error(title, message):
+    """Pop up a small tkinter error dialog."""
+    root = tk.Tk()
+    root.withdraw()          # hide the blank root window
+    messagebox.showerror(title=title, message=message)
+    root.destroy()
 
 def resource_path(filename):
     """
@@ -158,12 +164,20 @@ def generate_report_csv():
         return
 
     full_path = os.path.join(output_path, filename)
-    write_dispatchActivity(full_path)
-    write_caseClassification(full_path)
-    write_Interventions(full_path)
-    write_ArtLine(full_path)
-    write_ROSCRates(full_path)
-    write_DischargeStatus(full_path)
+
+    tasks = [(write_dispatchActivity, 1),
+            (write_caseClassification, 2),
+            (write_Interventions, 3),
+            (write_ArtLine, 4),
+            (write_ROSCRates, 5),
+            (write_DischargeStatus, 6),
+    ]
+
+    for write, errorCode in tasks:
+        try:
+            write(full_path)
+        except Exception as e:
+            show_error("Error", f"Error #{errorCode}: {e}. Please contact your systems operator")
 
     print("report generated")
 
@@ -368,7 +382,7 @@ def write_DischargeStatus(csv):
             custom_date_list
             )
 
-    Report.set_DischarchStatus(DischargeStatus_df)
+    Report.set_DischargeStatus(DischargeStatus_df)
 
     DischargeStatus_df.to_csv(csv, mode="a", index=False)
     print(f"Discharge Status Saved to: {csv}")
