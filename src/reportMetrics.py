@@ -5,20 +5,28 @@ from datetime import datetime
 
 def dispatchActivity(date_from, date_to, df):
     """
-    Within the date range set by args date_from and date_to, returns a 4 element
+    Within the date range set by args date_from and date_to, returns a 5 element
     list consiting of:
     [ Number of patients with interventions,
     Median time from dispatch to departure,
     Median time from dispatch to arrival,
-    Median time from 000 call to patient
+    Median time from 000 call to patient,
+    Total cases attended
+    Non arrest patients who received treatment / total non arrest
+    Patients who successfully received ECPR
     ]
     by iterating through given dataframe
     """
     #Number of patients with interventions
+    total_cases_attended = 0
+    non_arrest = 0
+    non_arrest_interventions = 0
     total_interventions = 0
+    successful_ECPR_count = 0
     time_list_dispatchToArrival = []
     time_list_dispatchToDeparture = []
     time_list_000CallToArrival = []
+
     for index, row in df.iterrows():
         #handle empty rows
         if pd.isna(row['date_time_incident']) and pd.isna(row['date_time_incident']):
@@ -36,6 +44,17 @@ def dispatchActivity(date_from, date_to, df):
 
         #collect data from within relevent dates
         if (dateObject.date() > date_from) and (dateObject.date() < date_to):
+            #count cases
+            total_cases_attended += 1
+            #count interventions on non arrent patients
+            if row["not_in_cardiac_arrest"] == 0:
+                print(f"non cardiac arrest patient identified {date}")
+                non_arrest += 1
+                print(f"nonarrest = {non_arrest}")
+                non_arrest_interventions += checkInterventions(row)[0]
+            # count number of ECPR patients (defined as flow achieved)
+            if is_datetime(row["cann_complete_date_time"]):
+                successful_ECPR_count += 1
             #Number of patients with interventions
             total_interventions += checkInterventions(row)[0]
             # unsure how to calculate dispatch to arrival at this time
@@ -82,7 +101,11 @@ def dispatchActivity(date_from, date_to, df):
             f"{dispatch_arr_Med} " +
                 '(' + f"{dispatch_arr_Min}" + ' - ' + f"{dispatch_arr_Max}" + ')',
             f"{_000CallMed} " +
-                "(" + f"{_000CallMin}" + " - " + f"{_000CallMmax}" + ")"]
+                "(" + f"{_000CallMin}" + " - " + f"{_000CallMmax}" + ")",
+            str(total_cases_attended),
+            f"{non_arrest_interventions}/{non_arrest} ({(non_arrest_interventions/non_arrest)*100:.2f}%)",
+            str(successful_ECPR_count)
+            ]
 
 def caseClassification(date_from, date_to, df):
     total_arrests = 0
@@ -209,6 +232,19 @@ def ArtLineAnalysis(date_from, date_to, df):
             str(post_ROSC_Artline)]
 
 def ROSCRateAnalysis(date_from, date_to, df):
+    """        "ROSC Rates":["Number of patients who achieved ROSC at any time",
+            "Median time of arrest to time of ROSC (range)",
+            "Number of patients who achieved sustained ROSC >20mins",
+            "Sustained ROSC gained:	never",
+            "			before PRECARE arrival",
+            "			on/after PRECARE arrival",
+            "			Missing data",
+            "Median time from PRECARE arrival to ROSC (range)",
+            "ECMO cannulation commenced (number successful cannulations)"],
+            "Last 30 Days"
+            "Last 90 Days"
+            "Patients who had ROSC on arrival to hospital"
+        })"""
     total_patients = 0
     any_ROSC = 0
     sustained_ROSC = 0
@@ -216,10 +252,13 @@ def ROSCRateAnalysis(date_from, date_to, df):
     ROSC_Before_arrival = 0
     ROSC_OnAfter_arrival = 0
     ECMO_commenced = 0
-    successful_cannulation = 0
+    successful_cannulation= 0
+    #new for nat
+    ROSC_on_Arrival_Hospital = 0
 
     arrest_to_ROSC_time_list = []
     ROSC_time_fromArrival_list = []
+
     for index, row in df.iterrows():
         #handle empty rows
         if pd.isna(row['date_time_incident']) and pd.isna(row['date_time_incident']):
@@ -239,6 +278,10 @@ def ROSCRateAnalysis(date_from, date_to, df):
             if is_datetime(row["arrest_time"]):
                 total_patients += 1
             else: continue #if no arrest then row is irrelevant
+            #new for nat
+            if row["pre_icu_initial_rhythm"] == 5:
+                print(f"ROSC before arrival found {date}") #defined as systole on arrival
+                ROSC_on_Arrival_Hospital += 1
 
             if is_one(row["any_rosc"]):
                 any_ROSC += 1
@@ -257,9 +300,9 @@ def ROSCRateAnalysis(date_from, date_to, df):
             if is_one(row["ecmo_cannulation_commenced"]):
                 print("cannula found")
                 ECMO_commenced += 1
-                if is_one(row["success_cann"]):
-                    print("success cannual")
-                    successful_cannulation += 1
+            if is_one(row["success_cann"]):
+                print("success cannual")
+                successful_cannulation += 1
 
     try:
         any_ROSC_str = f"{any_ROSC}/{total_patients} ({(any_ROSC/total_patients)*100:.2f}%)"
@@ -299,7 +342,31 @@ def ROSCRateAnalysis(date_from, date_to, df):
             '???', #unsure how to calculate missing data
             f"{ROSC_time_fromArrival_Med} " +
                 '(' + f"{ROSC_time_fromArrival_Min}" + ' - ' + f"{ROSC_time_fromArrival_Max}" + ')',
-            f"{ECMO_commenced} ({successful_cannulation})"]
+            f"{ECMO_commenced} ({successful_cannulation})",
+            str(successful_cannulation),
+            str(ROSC_on_Arrival_Hospital)]
+
+def dischargeStatus(date_from, date_to, df):
+    dischargeAlive = 0
+    for index, row in df.iterrows():
+        #handle empty rows
+        if pd.isna(row['date_time_incident']) and pd.isna(row['date_time_incident']):
+            continue #no useful data in row
+
+        #handle empty date times
+        if pd.isna(row['date_time_incident']):
+            #take the earliest time, either time of incidence or, if empty, time of dispatch
+            date = parse_date_and_time(row['dispatch_date_time'])[0]
+
+        else:
+            date = parse_date_and_time(str(row['date_time_incident']))[0]
+            dateObject = datetime.strptime(date, "%Y-%m-%d")
+
+        #collect data from within relevent dates
+        if (dateObject.date() > date_from) and (dateObject.date() < date_to):
+            if row["fu_discharge_status"] == 1 and row["not_in_cardiac_arrest"] == 1:
+                dischargeAlive += 1
+    return [str(dischargeAlive)]
 
 def is_numeric(entry):
     """
@@ -422,7 +489,37 @@ def checkInterventions(row):
         intervention_count["Assisted ETT"] += 1
         intervention = True
 
+    #new if statement for Nat's custom data
+    intervention = natcustomdata(row)
+
     return [intervention, intervention_count]
+
+def natcustomdata(row):
+    interv = False
+
+    if is_one(row["med_team_intervention___1"]):
+        interv = True
+    if is_one(row["med_team_intervention___2"]):
+        interv = True
+    if is_one(row["med_team_intervention___3"]):
+        interv = True
+    if is_one(row["additional_med_team_interventions___0"]):
+        interv = True
+    if is_one(row["additional_med_team_interventions___1"]):
+        interv = True
+    if is_one(row["additional_med_team_interventions___2"]):
+        interv = True
+    if is_one(row["additional_med_team_interventions___3"]):
+        interv = True
+    if is_one(row["additional_med_team_interventions___4"]):
+        interv = True
+    if is_one(row["additional_med_team_interventions___5"]):
+        interv = True
+    if is_one(row["additional_med_team_interventions___6"]):
+        interv = True
+    if is_one(row["additional_med_team_interventions___7"]):
+        interv = True
+    return interv
 
 def access_present(value):
     if str(value) == "" or str(value).lower() == "nan":

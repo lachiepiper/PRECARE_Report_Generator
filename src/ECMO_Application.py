@@ -23,6 +23,7 @@ output_path = None
 filename = "PRECARE_activity_report.csv"
 date_from = date(1900, 1, 1)
 date_to = date(1900, 1, 1)
+SaveCSV = False
 
 
 def resource_path(filename):
@@ -143,6 +144,8 @@ def generate_report_csv():
     global Report
     global df
     global date_from, date_to
+    global SaveCSV
+
     #report must be initialised here
     Report = PrecareReport.factory(customDates(),
         date_range_label = f"{date_from:%d/%m/%Y} - {date_to:%d/%m/%Y}")
@@ -160,12 +163,13 @@ def generate_report_csv():
     write_Interventions(full_path)
     write_ArtLine(full_path)
     write_ROSCRates(full_path)
+    write_DischargeStatus(full_path)
 
     print("report generated")
 
-    Report.to_csv(path = full_path+"DATA_STRUCTUREreport.csv")
+    Report.to_csv(path = full_path+"Raw Data Report.csv")
 
-    open_graph(Report)
+    open_graph(Report, SaveCSV)
 
 def write_dispatchActivity(csv):
     global df
@@ -182,7 +186,11 @@ def write_dispatchActivity(csv):
         "Dispatch activity" : ["Number of patients with interventions",
         "Median time from dispatch to departure (range)",
         "Median time from dispatch to arrival (range)",
-        "Median time from 000 call to patient (range)"],
+        "Median time from 000 call to patient (range)",
+        "Total Cases Attended:",
+        "Non arrest patients who received treatment / total non arrest",
+        "Patients who successfully received ECPR",
+        ],
         "Last 30 Days": month_list,
         "Last 90 Days": three_month_list
     })
@@ -315,7 +323,9 @@ def write_ROSCRates(csv):
         "			on/after PRECARE arrival",
         "			Missing data",
         "Median time from PRECARE arrival to ROSC (range)",
-        "ECMO cannulation commenced (number successful cannulations)"],
+        "ECMO cannulation commenced (number successful cannulations)",
+        "Number of patient in which flow was achieved",
+        "Patients who had achieved ROSC prior to arrival at hospital"],
         "Last 30 Days" : month_list,
         "Last 90 Days": three_month_list
     })
@@ -332,6 +342,36 @@ def write_ROSCRates(csv):
 
     ROSCRates_df.to_csv(csv, mode="a", index=False)
     print(f"ROSC Rates  Saved to: {csv}")
+
+def write_DischargeStatus(csv):
+    global df
+    global date_from, date_to
+    global Report
+
+    month_list = reportMetrics.dischargeStatus(
+        date.today() - timedelta(days=30), date.today(), df
+        )
+    three_month_list = reportMetrics.dischargeStatus(
+        date.today() - timedelta(days=90), date.today(), df
+        )
+    DischargeStatus_df = pd.DataFrame({
+        "Discharge Status":["Total number of patients that were in cardiac arrest and then were discharged “alive”"],
+        "Last 30 Days" : month_list,
+        "Last 90 Days": three_month_list
+    })
+
+    if customDates():
+        custom_date_list = reportMetrics.dischargeStatus(date_from, date_to, df)
+        DischargeStatus_df.insert(
+            3,
+            date_from.strftime("%d/%m/%Y") + " - " + date_to.strftime("%d/%m/%Y"),
+            custom_date_list
+            )
+
+    Report.set_DischarchStatus(DischargeStatus_df)
+
+    DischargeStatus_df.to_csv(csv, mode="a", index=False)
+    print(f"Discharge Status Saved to: {csv}")
 
 def customDates():
     return ((date_from != date(1900,1,1)) and (date_to != date(1900,1,1)))
@@ -441,6 +481,22 @@ def make_calender_elements(root):
         )
         btn_cal_to.grid(row=0, column=3, padx=5)
 
+def make_checkbox_elements(root):
+    # We use a tk.BooleanVar to bind the checkbox state, and update our global variable.
+    chk_var = tk.BooleanVar(value=SaveCSV)
+
+    def on_check():
+        global SaveCSV
+        SaveCSV = chk_var.get()
+
+    chk_save_data = tk.Checkbutton(
+        root,
+        text="Save raw data?",
+        variable=chk_var,
+        command=on_check
+    )
+    chk_save_data.pack(pady=5)
+
 def make_info_button(root):
     """Places a small info button in the bottom right corner."""
     try:
@@ -466,6 +522,9 @@ def main():
     write_header_image(root)
     make_file_buttons(root)
     make_calender_elements(root)
+
+    # --- ADD THE CHECKBOX HERE ---
+    make_checkbox_elements(root)
 
     # Separator line
     tk.Frame(root, height=1, bg="grey").pack(fill="x", padx=20, pady=5)

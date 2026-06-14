@@ -90,6 +90,26 @@ class PrecareReport:
     call_to_patient_range_low:          Optional[float] = None
     call_to_patient_range_high:         Optional[float] = None
 
+    cases_attended_30d:                 Optional[int] = None
+    cases_attended_90d:                 Optional[int] = None
+    cases_attended_range:               Optional[int] = None
+
+    total_non_arrest_30d:               Optional[int] = None
+    total_non_arrest_90d:               Optional[int] = None
+    total_non_arrest_range:             Optional[int] = None
+
+    non_arrest_percent_30d:             Optional[float] = None
+    non_arrest_percent_90d:             Optional[float] = None
+    non_arrest_percent_range:           Optional[float] = None
+
+    non_arrest_treatment_30d:           Optional[float] = None
+    non_arrest_treatment_90d:           Optional[float] = None
+    non_arrest_treatment_range:         Optional[float] = None
+
+    successful_ECPR_count_30d:           Optional[float] = None
+    successful_ECPR_count_90d:           Optional[float] = None
+    successful_ECPR_count_range:         Optional[float] = None
+
     # ════════════════════════════════════════════════════════════════════════
     # CASE CLASSIFICATION
     # ════════════════════════════════════════════════════════════════════════
@@ -263,6 +283,15 @@ class PrecareReport:
     ecmo_commenced_range:               Optional[int]   = None
     ecmo_successful_range:              Optional[int]   = None
 
+    ROSC_on_Arrival_Hospital_30d:        Optional[int]   = None
+    ROSC_on_Arrival_Hospital_90d:        Optional[int]   = None
+    ROSC_on_Arrival_Hospital_range:      Optional[int]   = None
+    # ════════════════════════════════════════════════════════════════════════
+    # DISCHARGE DISPOSITION
+    # ════════════════════════════════════════════════════════════════════════
+    discharged_alive_30d:                 Optional[int]   = None
+    discharged_alive_90d:                 Optional[int]   = None
+    discharged_alive_range:               Optional[int]   = None
     # ════════════════════════════════════════════════════════════════════════
     # HELPER METHODS
     # ════════════════════════════════════════════════════════════════════════
@@ -449,6 +478,15 @@ class PrecareReport:
             self.call_to_patient_range_low = time_list[1]
             self.call_to_patient_range_high = time_list[2]
 
+            self.cases_attended_range = df.iloc[4, 3]
+
+            list = self.parse_percentages(df.iloc[5, 3])
+            fraction_lst = list[0].split("/")
+            self.non_arrest_treatment_range = fraction_lst[0]
+            self.total_non_arrest_range = fraction_lst[1]
+            self.non_arrest_percent_range = list[1]
+            self.successful_ECPR_count_range = df.iloc[6, 3]
+
         month_list = df["Last 30 Days"]
         three_month_list = df["Last 90 Days"]
         # Number of patients with interventions
@@ -487,6 +525,24 @@ class PrecareReport:
         self.call_to_patient_90d = time_list[0]
         self.call_to_patient_90d_low = time_list[1]
         self.call_to_patient_90d_high = time_list[2]
+
+        self.cases_attended_30d = month_list[4]
+        self.cases_attended_90d = three_month_list[4]
+
+        list = self.parse_percentages(month_list[5])
+        fraction_lst = list[0].split("/")
+        self.non_arrest_treatment_30d =fraction_lst[0]
+        self.total_non_arrest_30d =  fraction_lst[1]
+        self.non_arrest_percent_30d = list[1]
+
+        list = self.parse_percentages(three_month_list[5])
+        fraction_lst = list[0].split("/")
+        self.non_arrest_treatment_90d = fraction_lst[0]
+        self.total_non_arrest_90d =  fraction_lst[1]
+        self.non_arrest_percent_90d = list[1]
+
+        self.successful_ECPR_count_30d = month_list[6]
+        self.successful_ECPR_count_90d = three_month_list[6]
 
     def set_CaseClassification(self, df: pd.dataframe):
         """sets data from a dataframe with Format:
@@ -675,14 +731,16 @@ class PrecareReport:
             self.rosc_before_precare_range = int(df.iloc[4,3])
             self.rosc_on_after_precare_range = int(df.iloc[5,3])
 
-            list = parse_integer_ranges(df.iloc[7,3])
+            list = self.parse_time_ranges(df.iloc[7,3])
             self.precare_arrival_to_rosc_range = list[0]
             self.precare_arrival_to_rosc_range_low = list[1]
             self.precare_arrival_to_rosc_range_high = list[2]
 
-            list = parse_ecmo_ranges(df.iloc[8,3])
+            list = self.parse_ecmo_ranges(df.iloc[8,3])
             self.ecmo_commenced_range = list[0]
             self.ecmo_successful_range = list[1]
+
+            self.ROSC_on_Arrival_Hospital = df.iloc[9,3]
 
         month_list = df["Last 30 Days"]
         three_month_list = df["Last 90 Days"]
@@ -750,6 +808,18 @@ class PrecareReport:
         list = self.parse_ecmo_ranges(three_month_list[8])
         self.ecmo_commenced_90d = list[0]
         self.ecmo_successful_90d = list[1]
+
+        self.ROSC_on_Arrival_Hospital = month_list[9]
+        self.ROSC_on_Arrival_Hospital = three_month_list[9]
+
+    def set_DischarchStatus(self, df:pd.dataframe):
+        if self.custom_dates_present:
+            self.discharged_alive_range =int(df.iloc[0,3])
+
+        month_list = df["Last 30 Days"]
+        three_month_list = df["Last 90 Days"]
+        self.discharged_alive_30d = month_list[0]
+        self.discharged_alive_90d = three_month_list[0]
 
 
     # ════════════════════════════════════════════════════════════════════════

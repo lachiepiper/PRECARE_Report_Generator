@@ -39,6 +39,9 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 # ── Typing ────────────────────────────────────────────────────────────────────
 from typing import Optional
 
+# ── Saving ────────────────────────────────────────────────────────────────────
+from pathlib import Path
+
 # ── Local import (the data-structure file must be on the Python path) ─────────
 # from precare_DataStructure import PrecareReport   # uncomment if needed
 
@@ -61,6 +64,11 @@ PIE_NEVER         = "#C0392B"       # red    – ROSC never achieved
 
 GRID_COLOUR       = "#ABEBC6"       # very light mint grid lines
 
+# ═════════════════════════════════════════════════════════════════════════════
+# SAVE CSV TOGGLE
+# ═════════════════════════════════════════════════════════════════════════════
+
+SaveCSV = False
 
 # ═════════════════════════════════════════════════════════════════════════════
 # HELPER UTILITIES
@@ -490,7 +498,7 @@ def _draw_art_line_time(ax, report):
 # SAVE CHART FUNCTION
 # ═════════════════════════════════════════════════════════════════════════════
 
-def _save_chart(figure):
+def _save_chart(figure, report):
     """
     Open a file-save dialogue and write the current figure to the chosen path.
 
@@ -498,7 +506,7 @@ def _save_chart(figure):
     """
     file_path = filedialog.asksaveasfilename(
         title="Save PRECARE Outcomes Chart",
-        initialfile="PRECARE Report Data"
+        initialfile="PRECARE Report Graph",
         defaultextension=".png",
         filetypes=[
             ("PNG image",        "*.png"),
@@ -523,6 +531,11 @@ def _save_chart(figure):
             "Chart Saved",
             f"Chart successfully saved to:\n{file_path}",
         )
+        if SaveCSV:
+            folder_address = Path(file_path + "\PRECARE Report Data")
+            folder_address.mkdir(parents=True, exist_ok=True)
+            Report.to_csv(path = folder_address+"Raw Data Report.csv")
+
     except Exception as exc:
         messagebox.showerror(
             "Save Error",
@@ -534,7 +547,7 @@ def _save_chart(figure):
 # MAIN ENTRY POINT  –  open_graph()
 # ═════════════════════════════════════════════════════════════════════════════
 
-def open_graph(report):
+def open_graph(report, CSVtoggle):
     """
     Build and display the WSLHD PRECARE outcomes report window.
 
@@ -547,6 +560,9 @@ def open_graph(report):
     The window is modal (Tkinter mainloop); execution resumes in the calling
     script only after the user closes the window.
     """
+    # save toggle
+    global SaveCSV
+    SaveCSV = CSVtoggle
 
     # ── Build the report title with date range ───────────────────────────────
     title_text = _build_title(report)
@@ -657,7 +673,7 @@ def open_graph(report):
         padx=20,
         pady=6,
         cursor="hand2",
-        command=lambda: _save_chart(figure),
+        command=lambda: _save_chart(figure, report),
     )
     # Use absolute positioning so the header stays perfectly centered
     save_button.place(relx=1.0, rely=0.0, x=-15, y=10, anchor="ne")
