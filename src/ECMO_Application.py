@@ -122,8 +122,6 @@ def choose_file():
         title="Select a CSV file",
         filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
     )
-    #debug
-    print(f"choosing file: {file_path}") #DEBUG
 
     if file_path:
         try:
@@ -216,7 +214,7 @@ def write_header_image(root):
     """Loads and displays an image at the top of the window."""
     try:
         from PIL import Image, ImageTk
-        img = Image.open(resource_path("/Users/lachiepiper/Desktop/ECMO/ECMO Application/assets/wma_photo.png"))
+        img = Image.open(resource_path("ECMO Application/assets/wma_photo.png"))
         #img = img.resize((500, 100))            # resize to fit the window
         photo = ImageTk.PhotoImage(img)
         lbl_image = tk.Label(root, image=photo)
@@ -284,7 +282,7 @@ def make_info_button(root):
     """Places a small info button in the bottom right corner."""
     try:
         from PIL import Image, ImageTk
-        img = Image.open(resource_path("/Users/lachiepiper/Desktop/ECMO/ECMO Application/assets/info.png"))
+        img = Image.open(resource_path("ECMO Application/assets/info.png"))
         img = img.resize((24, 24))
         photo = ImageTk.PhotoImage(img)
         btn_info = tk.Button(root, image=photo, command=show_info, bd=0, cursor="hand2")
