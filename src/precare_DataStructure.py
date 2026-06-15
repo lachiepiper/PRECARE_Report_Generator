@@ -842,7 +842,7 @@ class PrecareReport:
         Parameters
         ----------
         path : str, optional
-            If provided, the CSV is written to this file path in addition to
+            If provided, the CSV is written to this directory in addition to
             being returned as a string.
 
         Returns

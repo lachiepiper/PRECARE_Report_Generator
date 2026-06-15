@@ -1,29 +1,91 @@
-import sys
+import csv
+import io
 import os
+import sys
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
+from typing import Optional
+
+import pandas as pd
+import requests
 import tkinter as tk
 from tkinter import filedialog, messagebox
-from tkcalendar import Calendar
 from PIL import Image, ImageTk
-import pandas as pd
-from datetime import date, datetime, timedelta
+from tkcalendar import Calendar
+
 import reportMetrics
-from precare_DataStructure import PrecareReport
-from typing import Optional
-import csv
-import requests
-import io
 from Graphing import open_graph
-from dataclasses import dataclass, field
+from precare_DataStructure import PrecareReport
 
 
-# Global variables
-df = None
-Report = None
-output_path = None
-filename = "PRECARE_activity_report.csv"
-date_from = date(1900, 1, 1)
-date_to = date(1900, 1, 1)
-SaveCSV = False
+
+df = None                                       #holds REDCap data
+Report = None                                   #Holds parsed REDCap data
+CSV_str = ""                                    #Output csv before interpretation by PrecareDtastructure
+date_from = date(1900, 1, 1)                    #Optional FROM date
+date_to = date(1900, 1, 1)                      #Optional TO date
+SaveCSV = False                                 #User toggles desire for more comprehensive output csv
+
+
+    # ════════════════════════════════════════════════════════════════════════
+    # HELPER FUNCTIONS
+    # ════════════════════════════════════════════════════════════════════════
+def customDates():
+    return ((date_from != date(1900,1,1)) and (date_to != date(1900,1,1)))
+
+def show_info():
+    """Opens a popup window with information about the application."""
+    popup = tk.Toplevel()
+    popup.title("About")
+    popup.resizable(False, False)
+    popup.grab_set()
+
+    # Title label
+    lbl_title = tk.Label(
+        popup,
+        text="ECPR Report Generator",
+        font=("Helvetica", 14, "bold")
+    )
+    lbl_title.pack(padx=20, pady=(20, 5))
+
+    # Info text
+    info_text = (
+        "This application generates ECPR activity reports\n"
+        "Instructions:\n"
+        "PLEASE NOTE: This application will only take CSVs from the REDCap PRECARE database\n"
+        "Data Exports -> All Data -> Export Data -> CSV/Microsoft Excel (raw data)\n"
+        "PLEASE ONLY USE RAW DATA, NOT LABELS\n\n"
+        "1. Click 'Choose File' to load your CSV data file.\n"
+        "2. Optionally, select a custom date range. This will not appear in graph \n"
+        "3. If you want more comprehensive data, select \"Raw Data\". \n"
+        "\tThis will appear next to your saved graph"
+        "4. Click 'Create Report' to generate the report.\n\n"
+        "Reports include the last 30 and 90 days by default.\n"
+        "5. Click \"Save Graph\" and choose file destination"
+    )
+    lbl_info = tk.Label(
+        popup,
+        text=info_text,
+        justify="left",
+        wraplength=320
+    )
+    lbl_info.pack(padx=20, pady=(0, 10))
+
+    # Separator
+    tk.Frame(popup, height=1, bg="grey").pack(fill="x", padx=20, pady=5)
+
+    # Version label
+    lbl_version = tk.Label(
+        popup,
+        text="Version 1.0 \n © Lachlan Piper - Westmead Hospital",
+        fg="grey",
+        font=("Helvetica", 9)
+    )
+    lbl_version.pack(pady=(0, 5))
+
+    # Close button
+    btn_close = tk.Button(popup, text="Close", width=10, command=popup.destroy)
+    btn_close.pack(pady=(0, 15))
 
 def show_error(title, message):
     """Pop up a small tkinter error dialog."""
@@ -31,6 +93,15 @@ def show_error(title, message):
     root.withdraw()          # hide the blank root window
     messagebox.showerror(title=title, message=message)
     root.destroy()
+
+def choose_output_destination():
+    """This is legacy code and will be deleted """
+    global output_path
+    #output_path = filedialog.askdirectory(title="Select Output Destination")
+    #debug
+    output_path = "/Users/lachiepiper/Desktop/ECMO/ECMO Application/OUTPUT TESTS"
+    if output_path:
+        print(f"Selected output destination: {output_path}")
 
 def resource_path(filename):
     """
@@ -62,6 +133,8 @@ def choose_file():
             messagebox.showerror("Error", f"Failed to load CSV file:\n{e}")
 
 def get_REDCAP_Data():
+    """Unfortunately, accessing REDCap though APIs is banned by NSWHealth
+    This is legacy code and will be deleted"""
     global df
     # Define the API URL and your specific project token
     api_url = 'INSERT TOKEN'
@@ -91,15 +164,9 @@ def get_REDCAP_Data():
     else:
         print(f"Error: {response.status_code} - {response.text}")
 
-
-def choose_output_destination():
-    global output_path
-
-    #output_path = filedialog.askdirectory(title="Select Output Destination")
-    #debug
-    output_path = "/Users/lachiepiper/Desktop/ECMO/ECMO Application/OUTPUT TESTS"
-    if output_path:
-        print(f"Selected output destination: {output_path}")
+    # ════════════════════════════════════════════════════════════════════════
+    # UI Creation
+    # ════════════════════════════════════════════════════════════════════════
 
 def open_calendar(title, cal_button, is_from):
     """
@@ -145,6 +212,96 @@ def open_calendar(title, cal_button, is_from):
     btn_confirm = tk.Button(popup, text="Confirm", command=on_confirm)
     btn_confirm.pack(pady=(0, 10))
 
+def write_header_image(root):
+    """Loads and displays an image at the top of the window."""
+    try:
+        from PIL import Image, ImageTk
+        img = Image.open(resource_path("/Users/lachiepiper/Desktop/ECMO/ECMO Application/assets/wma_photo.png"))
+        #img = img.resize((500, 100))            # resize to fit the window
+        photo = ImageTk.PhotoImage(img)
+        lbl_image = tk.Label(root, image=photo)
+        lbl_image.image = photo                 # keep reference to prevent garbage collection
+        lbl_image.pack(pady=(10, 0))
+    except Exception as e:
+        print(f"Could not load image: {e}")
+
+def make_file_buttons(root):
+    # get file address
+    btn_choose_file = tk.Button(root, text="Choose File", command=choose_file)
+    btn_choose_file.pack(pady=10)
+
+    #get output destination
+    #btn_choose_output = tk.Button(root, text="Choose Output Destination", command=choose_output_destination)
+    #btn_choose_output.pack(pady=5)
+
+def make_calender_elements(root):
+        # --- Date range selector ---
+        date_frame = tk.Frame(root)
+        date_frame.pack(pady=15)
+
+        # Button to open 'from' calendar
+        btn_cal_from = tk.Button(
+            date_frame,
+            text='No date selected',
+            command=lambda: open_calendar("Select From Date", btn_cal_from , is_from=True)
+        )
+        btn_cal_from.grid(row=0, column=1, padx=5)
+
+        # "Analyse data from:" label
+        lbl_from = tk.Label(date_frame, text="Analyse data from:")
+        lbl_from.grid(row=0, column=0, padx=3)
+
+        # "to" label
+        lbl_to = tk.Label(date_frame, text="to")
+        lbl_to.grid(row=0, column=2, padx=3)
+
+        # Button to open 'to' calendar
+        btn_cal_to = tk.Button(
+            date_frame,
+            text='No date selected',
+            command=lambda: open_calendar("Select To Date", btn_cal_to, is_from=False)
+        )
+        btn_cal_to.grid(row=0, column=3, padx=5)
+
+def make_checkbox_elements(root):
+    global SaveCSV
+    # We use a tk.BooleanVar to bind the checkbox state, and update our global variable.
+    chk_var = tk.BooleanVar(value=SaveCSV)
+
+    def on_check():
+        global SaveCSV
+        SaveCSV = chk_var.get()
+
+    chk_save_data = tk.Checkbutton(
+        root,
+        text="Save raw data?",
+        variable=chk_var,
+        command=on_check
+    )
+    chk_save_data.pack(pady=5)
+
+def make_info_button(root):
+    """Places a small info button in the bottom right corner."""
+    try:
+        from PIL import Image, ImageTk
+        img = Image.open(resource_path("/Users/lachiepiper/Desktop/ECMO/ECMO Application/assets/info.png"))
+        img = img.resize((24, 24))
+        photo = ImageTk.PhotoImage(img)
+        btn_info = tk.Button(root, image=photo, command=show_info, bd=0, cursor="hand2")
+        btn_info.image = photo                  # keep reference to prevent garbage collection
+    except Exception as e:
+        # Fallback to a plain text button if image can't be loaded
+        print(f"Could not load info icon: {e}")
+        btn_info = tk.Button(root, text="ℹ", font=("Helvetica", 14), command=show_info, bd=0, cursor="hand2")
+
+    # Place in the bottom right corner using place() for precise positioning
+    btn_info.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-10)
+
+
+    # ════════════════════════════════════════════════════════════════════════
+    # Report Generation
+    # ════════════════════════════════════════════════════════════════════════
+
 def generate_report_csv():
     #TODO - DEBUG this when internet working
     global Report
@@ -159,11 +316,6 @@ def generate_report_csv():
     if df is None:
         messagebox.showwarning("No File", "Please load a CSV file first.")
         return
-    if output_path is None:
-        messagebox.showwarning("No Destination", "Please select an output destination first.")
-        return
-
-    full_path = os.path.join(output_path, filename)
 
     tasks = [(write_dispatchActivity, 1),
             (write_caseClassification, 2),
@@ -175,20 +327,19 @@ def generate_report_csv():
 
     for write, errorCode in tasks:
         try:
-            write(full_path)
+            write()
         except Exception as e:
             show_error("Error", f"Error #{errorCode}: {e}. Please contact your systems operator")
 
-    print("report generated")
-
-    Report.to_csv(path = full_path+"Raw Data Report.csv")
-
     open_graph(Report, SaveCSV)
 
-def write_dispatchActivity(csv):
+    print("report generated")
+
+def write_dispatchActivity():
     global df
     global date_from, date_to
     global Report
+    global CSV_str
 
     month_list = reportMetrics.dispatchActivity(
         date.today() - timedelta(days=30), date.today(), df
@@ -219,13 +370,14 @@ def write_dispatchActivity(csv):
 
     Report.set_dispatchActivity(dispatchActivity_df)
 
-    dispatchActivity_df.to_csv(csv, index=False)
-    print(f"Dispatch activity Saved to: {csv}")
+    CSV_str += dispatchActivity_df.to_csv(index=False)
+    print(f"Dispatch activity Saved")
 
-def write_caseClassification(csv):
+def write_caseClassification():
     global df
     global date_from, date_to
     global Report
+    global CSV_str
 
     month_data = reportMetrics.caseClassification(
         date.today() - timedelta(days=30), date.today(), df
@@ -249,13 +401,14 @@ def write_caseClassification(csv):
 
     Report.set_CaseClassification(caseClassification_df)
 
-    caseClassification_df.to_csv(csv, mode="a", index=False)
-    print(f"Case Classification Saved to: {csv}")
+    CSV_str += caseClassification_df.to_csv(index=False)
+    print(f"Case Classification Saved")
 
-def write_Interventions(csv):
+def write_Interventions():
     global df
     global date_from, date_to
     global Report
+    global CSV_str
 
     month_list = reportMetrics.interventionsPerformed(
         date.today() - timedelta(days=30), date.today(), df
@@ -282,13 +435,14 @@ def write_Interventions(csv):
             )
     Report.set_Interventions(Interventions_df)
 
-    Interventions_df.to_csv(csv, mode="a", index=False)
-    print(f"Interventions Performed Saved to: {csv}")
+    CSV_str += Interventions_df.to_csv(index=False)
+    print(f"Interventions Performed Saved")
 
-def write_ArtLine(csv):
+def write_ArtLine():
     global df
     global date_from, date_to
     global Report
+    global CSV_str
 
     month_list = reportMetrics.ArtLineAnalysis(
         date.today() - timedelta(days=30), date.today(), df
@@ -314,13 +468,14 @@ def write_ArtLine(csv):
 
     Report.set_Artline_data(ArtLine_df)
 
-    ArtLine_df.to_csv(csv, mode="a", index=False)
-    print(f"Artline Analysis Saved to: {csv}")
+    CSV_str +=  ArtLine_df.to_csv(index=False)
+    print(f"Artline Analysis Saved")
 
-def write_ROSCRates(csv):
+def write_ROSCRates():
     global df
     global date_from, date_to
     global Report
+    global CSV_str
 
     month_list = reportMetrics.ROSCRateAnalysis(
         date.today() - timedelta(days=30), date.today(), df
@@ -354,13 +509,14 @@ def write_ROSCRates(csv):
 
     Report.set_ROSC_rates(ROSCRates_df)
 
-    ROSCRates_df.to_csv(csv, mode="a", index=False)
-    print(f"ROSC Rates  Saved to: {csv}")
+    CSV_str += ROSCRates_df.to_csv(index=False)
+    print(f"ROSC Rates  Saved")
 
-def write_DischargeStatus(csv):
+def write_DischargeStatus():
     global df
     global date_from, date_to
     global Report
+    global CSV_str
 
     month_list = reportMetrics.dischargeStatus(
         date.today() - timedelta(days=30), date.today(), df
@@ -384,150 +540,10 @@ def write_DischargeStatus(csv):
 
     Report.set_DischargeStatus(DischargeStatus_df)
 
-    DischargeStatus_df.to_csv(csv, mode="a", index=False)
-    print(f"Discharge Status Saved to: {csv}")
+    CSV_str += DischargeStatus_df.to_csv(index=False)
+    print(f"Discharge Status Saved")
 
-def customDates():
-    return ((date_from != date(1900,1,1)) and (date_to != date(1900,1,1)))
-
-def show_info():
-    """Opens a popup window with information about the application."""
-    popup = tk.Toplevel()
-    popup.title("About")
-    popup.resizable(False, False)
-    popup.grab_set()
-
-    # Title label
-    lbl_title = tk.Label(
-        popup,
-        text="ECPR Report Generator",
-        font=("Helvetica", 14, "bold")
-    )
-    lbl_title.pack(padx=20, pady=(20, 5))
-
-    # Info text
-    info_text = (
-        "This application generates ECPR activity reports\n"
-        "Instructions:\n"
-        "PLEASE NOTE: This application will only take CSVs from the REDCap PRECARE database\n"
-        "Data Exports -> All Data -> Export Data -> CSV/Microsoft Excel (raw data)\n"
-        "PLEASE ONLY USE RAW DATA, NOT LABELS\n\n"
-        "1. Click 'Choose File' to load your CSV data file.\n"
-        "2. Click 'Choose Output Destination' to select\n"
-        "   where the report will be saved.\n"
-        "3. Optionally select a custom date range.\n"
-        "4. Click 'Create Report' to generate the report.\n\n"
-        "Reports include the last 30 and 90 days by default.\n"
-        "A custom date range column is added if dates are selected."
-    )
-    lbl_info = tk.Label(
-        popup,
-        text=info_text,
-        justify="left",
-        wraplength=320
-    )
-    lbl_info.pack(padx=20, pady=(0, 10))
-
-    # Separator
-    tk.Frame(popup, height=1, bg="grey").pack(fill="x", padx=20, pady=5)
-
-    # Version label
-    lbl_version = tk.Label(
-        popup,
-        text="Version 1.0 \n © Lachlan Piper - Westmead Hospital",
-        fg="grey",
-        font=("Helvetica", 9)
-    )
-    lbl_version.pack(pady=(0, 5))
-
-    # Close button
-    btn_close = tk.Button(popup, text="Close", width=10, command=popup.destroy)
-    btn_close.pack(pady=(0, 15))
-
-def write_header_image(root):
-    """Loads and displays an image at the top of the window."""
-    try:
-        from PIL import Image, ImageTk
-        img = Image.open(resource_path("/Users/lachiepiper/Desktop/ECMO/ECMO Application/assets/wma_photo.png"))
-        #img = img.resize((500, 100))            # resize to fit the window
-        photo = ImageTk.PhotoImage(img)
-        lbl_image = tk.Label(root, image=photo)
-        lbl_image.image = photo                 # keep reference to prevent garbage collection
-        lbl_image.pack(pady=(10, 0))
-    except Exception as e:
-        print(f"Could not load image: {e}")
-
-def make_file_buttons(root):
-    # get file address
-    btn_choose_file = tk.Button(root, text="Choose File", command=choose_file)
-    btn_choose_file.pack(pady=10)
-
-    #get output destination
-    btn_choose_output = tk.Button(root, text="Choose Output Destination", command=choose_output_destination)
-    btn_choose_output.pack(pady=5)
-
-def make_calender_elements(root):
-        # --- Date range selector ---
-        date_frame = tk.Frame(root)
-        date_frame.pack(pady=15)
-
-        # Button to open 'from' calendar
-        btn_cal_from = tk.Button(
-            date_frame,
-            text='No date selected',
-            command=lambda: open_calendar("Select From Date", btn_cal_from , is_from=True)
-        )
-        btn_cal_from.grid(row=0, column=1, padx=5)
-
-        # "Analyse data from:" label
-        lbl_from = tk.Label(date_frame, text="Analyse data from:")
-        lbl_from.grid(row=0, column=0, padx=3)
-
-        # "to" label
-        lbl_to = tk.Label(date_frame, text="to")
-        lbl_to.grid(row=0, column=2, padx=3)
-
-        # Button to open 'to' calendar
-        btn_cal_to = tk.Button(
-            date_frame,
-            text='No date selected',
-            command=lambda: open_calendar("Select To Date", btn_cal_to, is_from=False)
-        )
-        btn_cal_to.grid(row=0, column=3, padx=5)
-
-def make_checkbox_elements(root):
-    # We use a tk.BooleanVar to bind the checkbox state, and update our global variable.
-    chk_var = tk.BooleanVar(value=SaveCSV)
-
-    def on_check():
-        global SaveCSV
-        SaveCSV = chk_var.get()
-
-    chk_save_data = tk.Checkbutton(
-        root,
-        text="Save raw data?",
-        variable=chk_var,
-        command=on_check
-    )
-    chk_save_data.pack(pady=5)
-
-def make_info_button(root):
-    """Places a small info button in the bottom right corner."""
-    try:
-        from PIL import Image, ImageTk
-        img = Image.open(resource_path("/Users/lachiepiper/Desktop/ECMO/ECMO Application/assets/info.png"))
-        img = img.resize((24, 24))
-        photo = ImageTk.PhotoImage(img)
-        btn_info = tk.Button(root, image=photo, command=show_info, bd=0, cursor="hand2")
-        btn_info.image = photo                  # keep reference to prevent garbage collection
-    except Exception as e:
-        # Fallback to a plain text button if image can't be loaded
-        print(f"Could not load info icon: {e}")
-        btn_info = tk.Button(root, text="ℹ", font=("Helvetica", 14), command=show_info, bd=0, cursor="hand2")
-
-    # Place in the bottom right corner using place() for precise positioning
-    btn_info.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-10)
-
+#------------------------------------------------------------------------------
 def main():
     root = tk.Tk()
     root.title("PRECARE Report Generator")

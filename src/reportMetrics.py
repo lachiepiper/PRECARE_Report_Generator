@@ -1,7 +1,9 @@
 import pandas as pd
 from datetime import datetime
 
-
+    # ════════════════════════════════════════════════════════════════════════
+    # Data Parsing
+    # ════════════════════════════════════════════════════════════════════════
 
 def dispatchActivity(date_from, date_to, df):
     """
@@ -369,6 +371,10 @@ def dischargeStatus(date_from, date_to, df):
                 dischargeAlive += 1
     return [str(dischargeAlive)]
 
+    # ════════════════════════════════════════════════════════════════════════
+    # Helper functions
+    # ════════════════════════════════════════════════════════════════════════
+
 def is_numeric(entry):
     """
     Checks if an entry is a number or a numeric string.
@@ -526,7 +532,6 @@ def access_present(value):
     if str(value) == "" or str(value).lower() == "nan":
         return False
     else: return str(int(value)).strip() in {"1", "2", "3"}
-
 
 def is_one(value):
     if str(value) == "" or str(value).lower() == "nan":

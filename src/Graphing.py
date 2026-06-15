@@ -521,20 +521,18 @@ def _save_chart(figure, report):
         return
 
     try:
-        figure.savefig(
-            file_path,
-            dpi=200,
-            bbox_inches="tight",
-            facecolor=FIGURE_FACECOLOUR,
-        )
+        if SaveCSV:
+            print(f"path = {file_path}")
+            report.to_csv(path = file_path[0:file_path.rfind(".")]+ ".csv")
+            figure.savefig(file_path, dpi=200, bbox_inches="tight",facecolor=FIGURE_FACECOLOUR,)
+
+        else: figure.savefig(file_path, dpi=200, bbox_inches="tight",facecolor=FIGURE_FACECOLOUR,)
+
         messagebox.showinfo(
             "Chart Saved",
             f"Chart successfully saved to:\n{file_path}",
         )
-        if SaveCSV:
-            folder_address = Path(file_path + "\PRECARE Report Data")
-            folder_address.mkdir(parents=True, exist_ok=True)
-            Report.to_csv(path = folder_address+"Raw Data Report.csv")
+
 
     except Exception as exc:
         messagebox.showerror(
@@ -666,9 +664,9 @@ def open_graph(report, CSVtoggle):
         text="💾  Save Chart",
         font=("Helvetica", 11, "bold"),
         bg="#2980B9",
-        fg="white",
+        fg="black",
         activebackground="#1A5276",
-        activeforeground="white",
+        activeforeground="grey",
         relief=tk.FLAT,
         padx=20,
         pady=6,
