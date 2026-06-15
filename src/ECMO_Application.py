@@ -103,17 +103,14 @@ def choose_output_destination():
     if output_path:
         print(f"Selected output destination: {output_path}")
 
-def resource_path(filename):
-    """
-    Returns the correct path to a resource file whether running
-    as a script or as a PyInstaller bundle.
-    """
+def resource_path(relative_path):
+    """Get the absolute path to a resource, works for dev and PyInstaller."""
     if hasattr(sys, '_MEIPASS'):
-        # Running as a PyInstaller bundle
-        return os.path.join(sys._MEIPASS, filename)
+        base_path = sys._MEIPASS
     else:
-        # Running as a normal script
-        return os.path.join(os.path.dirname(__file__), filename)
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_path, relative_path)
 
 def choose_file():
     global df
@@ -214,7 +211,7 @@ def write_header_image(root):
     """Loads and displays an image at the top of the window."""
     try:
         from PIL import Image, ImageTk
-        img = Image.open(resource_path("ECMO Application/assets/wma_photo.png"))
+        img = Image.open(resource_path("assets/wma_photo.png"))
         #img = img.resize((500, 100))            # resize to fit the window
         photo = ImageTk.PhotoImage(img)
         lbl_image = tk.Label(root, image=photo)
@@ -282,7 +279,7 @@ def make_info_button(root):
     """Places a small info button in the bottom right corner."""
     try:
         from PIL import Image, ImageTk
-        img = Image.open(resource_path("ECMO Application/assets/info.png"))
+        img = Image.open(resource_path("assets/info.png"))
         img = img.resize((24, 24))
         photo = ImageTk.PhotoImage(img)
         btn_info = tk.Button(root, image=photo, command=show_info, bd=0, cursor="hand2")
